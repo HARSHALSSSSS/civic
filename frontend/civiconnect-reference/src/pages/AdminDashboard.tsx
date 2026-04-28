@@ -45,6 +45,7 @@ import {
   AreaChart
 } from "recharts";
 import { NotificationBell } from "@/components/NotificationBell";
+import { RealtimeMapDashboard } from "@/components/RealtimeMapDashboard";
 
 interface AnalyticsData {
   summary: {
@@ -365,10 +366,11 @@ export const AdminDashboard = ({ reports, onUpdateReport, token }: AdminDashboar
 
       {/* Analytics Section */}
       <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="categories">Categories</TabsTrigger>
           <TabsTrigger value="trends">Trends</TabsTrigger>
+          <TabsTrigger value="map">Map View</TabsTrigger>
           <TabsTrigger value="reports">Reports</TabsTrigger>
         </TabsList>
 
@@ -568,6 +570,10 @@ export const AdminDashboard = ({ reports, onUpdateReport, token }: AdminDashboar
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="map" className="space-y-4">
+          <RealtimeMapDashboard token={token || ""} />
         </TabsContent>
 
         <TabsContent value="reports">

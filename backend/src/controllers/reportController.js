@@ -92,6 +92,16 @@ const createReport = async (req, res, next) => {
       });
     }
 
+    if (io) {
+      io.emit('new_report_map_update', {
+        id: report._id,
+        category: report.category,
+        priority: report.priority,
+        location: report.location,
+        createdAt: report.createdAt
+      });
+    }
+
     res.status(201).json({
       success: true,
       message: 'Report submitted successfully',

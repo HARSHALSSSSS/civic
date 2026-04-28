@@ -12,7 +12,7 @@ const {
   markNotificationRead,
   markAllNotificationsRead
 } = require('../controllers/reportController');
-const { getAdvancedAnalytics, getStats } = require('../controllers/analyticsController');
+const { getAdvancedAnalytics, getGeospatialSummary, getStats } = require('../controllers/analyticsController');
 const { protect, optionalAuth } = require('../middleware/auth');
 const { upload, processImages } = require('../middleware/upload');
 const Report = require('../models/Report');
@@ -184,6 +184,7 @@ router.put('/notifications/read-all', protect, markAllNotificationsRead);
 
 // Analytics routes
 router.get('/analytics/advanced', protect, getAdvancedAnalytics);
+router.get('/analytics/geospatial', protect, getGeospatialSummary);
 router.get('/analytics/stats', getStats);
 
 module.exports = router;

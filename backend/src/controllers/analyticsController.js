@@ -300,6 +300,69 @@ const getAdvancedAnalytics = async (req, res, next) => {
   }
 };
 
+// @desc    Get geospatial summary of reports
+// @route   GET /api/reports/analytics/geospatial
+// @access  Private (Admin/Staff only)
+const getGeospatialSummary = async (req, res, next) => {
+  try {
+    const { precision = 2 } = req.query; // decimal places for rounding coordinates
+    const p = Math.pow(10, parseInt(precision));
+
+    const geospatialSummary = await Report.aggregate([
+      {
+        $project: {
+          category: 1,
+          status: 1,
+          longitude: { $arrayElemAt: ['$location.coordinates', 0] },
+          latitude: { $arrayElemAt: ['$location.coordinates', 1] }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            lng: { $divide: [{ $floor: { $multiply: ['$longitude', p] } }, p] },
+            lat: { $divide: [{ $floor: { $multiply: ['$latitude', p] } }, p] },
+            category: '$category'
+          },
+          count: { $sum: 1 }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            lng: '$_id.lng',
+            lat: '$_id.lat'
+          },
+          totalCount: { $sum: '$count' },
+          categories: {
+            $push: {
+              category: '$_id.category',
+              count: '$count'
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          longitude: '$_id.lng',
+          latitude: '$_id.lat',
+          totalCount: 1,
+          categories: 1
+        }
+      }
+    ]);
+
+    res.json({
+      success: true,
+      data: geospatialSummary
+    });
+  } catch (error) {
+    logger.error(`Geospatial summary error: ${error.message}`);
+    next(error);
+  }
+};
+
 // @desc    Get simple stats for dashboard
 // @route   GET /api/reports/analytics/stats
 // @access  Public
@@ -345,5 +408,6 @@ const getStats = async (req, res, next) => {
 
 module.exports = {
   getAdvancedAnalytics,
+  getGeospatialSummary,
   getStats
 };
