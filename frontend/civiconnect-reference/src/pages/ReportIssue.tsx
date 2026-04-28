@@ -18,6 +18,7 @@ import { mockAIService, mockLocationService } from "@/services/mockData";
 import { apiService } from "@/services/apiService";
 import { Report } from "@/types";
 import { useToast } from "@/hooks/use-toast";
+import { MapPicker } from "@/components/MapPicker";
 
 interface ReportIssueProps {
   userId: string;
@@ -357,32 +358,46 @@ export const ReportIssue = ({ userId, onReportSubmitted }: ReportIssueProps) => 
 
           {/* Location */}
           <div className="space-y-2">
-            <Label>Location</Label>
-            {location ? (
-              <div className="bg-success-light rounded-lg p-4 space-y-2">
-                <div className="flex items-center gap-2 text-success">
-                  <CheckCircle className="h-4 w-4" />
-                  <span className="font-semibold">Location captured</span>
-                </div>
-                <p className="text-sm text-muted-foreground">{location.address}</p>
-                <p className="text-xs text-muted-foreground">
-                  {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
-                </p>
-              </div>
-            ) : (
+            <div className="flex items-center justify-between">
+              <Label>Location</Label>
               <Button
-                variant="outline"
+                variant="ghost"
+                size="sm"
                 onClick={getCurrentLocation}
                 disabled={isGettingLocation}
-                className="w-full"
+                className="h-8 text-xs"
               >
                 {isGettingLocation ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
                 ) : (
-                  <MapPin className="h-4 w-4 mr-2" />
+                  <MapPin className="h-3 w-3 mr-1" />
                 )}
-                {isGettingLocation ? "Getting Location..." : "Get Current Location"}
+                Get Current
               </Button>
+            </div>
+            
+            <MapPicker 
+              initialLocation={location ? { lat: location.lat, lng: location.lng } : undefined}
+              onLocationSelect={(lat, lng) => {
+                setLocation(prev => ({
+                  lat,
+                  lng,
+                  address: prev?.address || "Selected location"
+                }));
+              }}
+            />
+
+            {location && (
+              <div className="bg-success-light rounded-lg p-3 space-y-1">
+                <div className="flex items-center gap-2 text-success">
+                  <CheckCircle className="h-4 w-4" />
+                  <span className="font-semibold text-sm">Location set</span>
+                </div>
+                <p className="text-xs text-muted-foreground">{location.address}</p>
+                <p className="text-[10px] text-muted-foreground">
+                  {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
+                </p>
+              </div>
             )}
           </div>
 

@@ -8,7 +8,9 @@ import {
   Alert,
   ScrollView,
   ActivityIndicator,
+  Dimensions,
 } from 'react-native';
+import MapView, { Marker, UrlTile, PROVIDER_DEFAULT } from 'react-native-maps';
 import apiService, { User } from '../services/api';
 
 interface ReportIssueScreenProps {
@@ -20,10 +22,10 @@ const ReportIssueScreen: React.FC<ReportIssueScreenProps> = ({ navigation }) => 
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<User | null>(null);
-  const [location] = useState({
-    latitude: 28.6139 + Math.random() * 0.01, // Simulate Delhi location
-    longitude: 77.2090 + Math.random() * 0.01,
-    address: 'New Delhi, India'
+  const [location, setLocation] = useState({
+    latitude: -1.286389,
+    longitude: 36.817223,
+    address: 'Nairobi, Kenya'
   });
 
   useEffect(() => {
@@ -118,8 +120,53 @@ const ReportIssueScreen: React.FC<ReportIssueScreenProps> = ({ navigation }) => 
         />
 
         <Text style={styles.sectionTitle}>Location</Text>
+        <View style={styles.mapContainer}>
+          <MapView
+            provider={PROVIDER_DEFAULT}
+            style={styles.map}
+            initialRegion={{
+              latitude: location.latitude,
+              longitude: location.longitude,
+              latitudeDelta: 0.05,
+              longitudeDelta: 0.05,
+            }}
+            onPress={(e) => {
+              setLocation({
+                ...location,
+                latitude: e.nativeEvent.coordinate.latitude,
+                longitude: e.nativeEvent.coordinate.longitude
+              });
+            }}
+          >
+            <UrlTile
+              urlTemplate="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              maximumZ={19}
+              flipY={false}
+            />
+            <Marker
+              coordinate={{
+                latitude: location.latitude,
+                longitude: location.longitude,
+              }}
+              draggable
+              onDragEnd={(e) => {
+                setLocation({
+                  ...location,
+                  latitude: e.nativeEvent.coordinate.latitude,
+                  longitude: e.nativeEvent.coordinate.longitude
+                });
+              }}
+              title="Issue Location"
+              description="Long press and drag to move"
+            />
+          </MapView>
+          <View style={styles.mapOverlay}>
+            <Text style={styles.mapOverlayText}>Tap map or drag pin to select location</Text>
+          </View>
+        </View>
+
         <View style={styles.locationBox}>
-          <Text style={styles.locationText}>📍 GPS Auto-captured</Text>
+          <Text style={styles.locationText}>📍 Selected Location</Text>
           <Text style={styles.locationAddress}>{location.address}</Text>
           <Text style={styles.locationCoords}>
             {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
@@ -201,6 +248,34 @@ const styles = StyleSheet.create({
   textArea: {
     height: 100,
     textAlignVertical: 'top',
+  },
+  mapContainer: {
+    height: 250,
+    width: '100%',
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#e1e1e1',
+    marginBottom: 10,
+    position: 'relative',
+  },
+  map: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  mapOverlay: {
+    position: 'absolute',
+    bottom: 10,
+    left: 10,
+    right: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    padding: 5,
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  mapOverlayText: {
+    fontSize: 10,
+    color: '#2c3e50',
+    fontWeight: '600',
   },
   locationBox: {
     backgroundColor: '#ffffff',
