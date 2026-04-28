@@ -44,7 +44,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Samvad</Text>
+        <Text style={styles.title}>Civiconnect</Text>
         <Text style={styles.subtitle}>Civic Issue Reporting</Text>
       </View>
 

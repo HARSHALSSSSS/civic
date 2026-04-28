@@ -1,11 +1,11 @@
-# Samvad - AI-Powered Civic Issue Reporting Platform
+# Civiconnect - AI-Powered Civic Issue Reporting Platform
 
-![Samvad Logo](https://img.shields.io/badge/Samvad-Civic%20Platform-blue?style=for-the-badge)
+![Civiconnect Logo](https://img.shields.io/badge/Civiconnect-Civic%20Platform-blue?style=for-the-badge)
 ![SIH 2025](https://img.shields.io/badge/SIH-2025-orange?style=for-the-badge)
 ![Status](https://img.shields.io/badge/Status-Demo%20Ready-green?style=for-the-badge)
 
 ## 🏛️ Project Overview
-**Samvad** is a comprehensive civic issue reporting and resolution platform designed for **SIH 2025 demonstration**. It bridges the gap between citizens and government by enabling **30-second problem submission** while providing officials with powerful management tools.
+**Civiconnect** is a comprehensive civic issue reporting and resolution platform designed for **SIH 2025 demonstration**. It bridges the gap between citizens and government by enabling **30-second problem submission** while providing officials with powerful management tools.
 
 ### 🎯 Problem Statement
 Current civic issue reporting systems are:
@@ -58,7 +58,7 @@ Current civic issue reporting systems are:
 ## 📱 Demo Flow
 
 ### Phase 1: Citizen Experience (90 seconds)
-1. **Open Samvad App** → Login with `citizen@example.com`
+1. **Open Civiconnect App** → Login with `citizen@example.com`
 2. **Report Issue** → "Large pothole on Main Street"
 3. **GPS Auto-capture** → Location automatically detected
 4. **AI Magic** → System categorizes as "Pothole" → Routes to "PWD"
@@ -95,7 +95,7 @@ npm run dev  # Runs on http://localhost:3000
 
 ### 2. Setup Mobile App
 ```bash
-cd frontend/SamvadApp
+cd frontend/CiviconnectApp
 npm install
 npx react-native run-android  # or run-ios
 ```
@@ -115,13 +115,13 @@ Login: admin@government.in
 ## 📁 Project Architecture
 
 ```
-samvad-civic-platform/
+civiconnect-platform/
 ├── 🖥️  backend/                    # Next.js API Server
 │   ├── pages/api/                  # REST API endpoints
 │   ├── lib/dataManager.js         # Data storage logic
 │   ├── data/                      # JSON database files
 │   └── styles/Admin.module.css    # Dashboard styling
-├── 📱 frontend/SamvadApp/          # React Native Mobile App
+├── 📱 frontend/CiviconnectApp/      # React Native Mobile App
 │   ├── src/screens/               # App screens (Login, Report, Issues)
 │   ├── src/services/api.ts        # API communication layer
 │   └── src/components/            # Reusable UI components
@@ -208,7 +208,7 @@ assignDepartment(category) {
 
 ## 🏆 SIH 2025 Team
 
-**Project Name:** Samvad - AI-Powered Civic Issue Reporting Platform  
+**Project Name:** Civiconnect - AI-Powered Civic Issue Reporting Platform  
 **Problem Statement:** Smart India Hackathon 2025  
 **Team Focus:** Digital Governance & Civic Engagement  
 **Demo Duration:** 5-7 minutes  

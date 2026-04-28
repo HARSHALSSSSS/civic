@@ -1,4 +1,4 @@
-# Samvad Platform - Setup Instructions
+# Civiconnect Platform - Setup Instructions
 
 ## 🚀 Quick Start Guide for SIH 2025 Demo
 
@@ -33,7 +33,7 @@
 
 1. **Navigate to mobile app directory:**
    ```bash
-   cd frontend/SamvadApp
+   cd frontend/CiviconnectApp
    ```
 
 2. **Install dependencies:**
@@ -55,7 +55,7 @@
 ### 🔧 Configuration
 
 #### Mobile App API Configuration
-Edit `frontend/SamvadApp/src/services/api.ts`:
+Edit `frontend/CiviconnectApp/src/services/api.ts`:
 ```typescript
 // Change this to your backend URL
 const BASE_URL = 'http://YOUR_IP_ADDRESS:3000/api';
@@ -128,13 +128,13 @@ cd android && ./gradlew clean && cd ..
 
 ### 📁 Project Structure
 ```
-samvad-civic-platform/
+civiconnect-platform/
 ├── backend/                 # Next.js API server
 │   ├── pages/api/          # API endpoints
 │   ├── lib/dataManager.js  # Data storage
 │   ├── data/               # JSON database files
 │   └── styles/             # CSS for admin dashboard
-├── frontend/SamvadApp/     # React Native mobile app
+├── frontend/CiviconnectApp/     # React Native mobile app
 │   ├── src/screens/        # App screens
 │   ├── src/services/       # API service
 │   └── src/components/     # Reusable components
@@ -187,5 +187,5 @@ For technical issues during demo:
 ```env
 DATABASE_URL=postgresql://...
 JWT_SECRET=your-secret-key
-API_BASE_URL=https://api.samvad.gov.in
+API_BASE_URL=https://api.civiconnect.gov.in
 ```

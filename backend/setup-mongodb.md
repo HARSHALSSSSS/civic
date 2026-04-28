@@ -13,7 +13,7 @@
    - Copy the connection string
 4. **Update your .env file**:
    ```bash
-   MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/samvad-civic-connect?retryWrites=true&w=majority
+   MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/civiconnect?retryWrites=true&w=majority
    ```
 5. **Replace `username` and `password` with your credentials**
 
@@ -33,7 +33,7 @@
    ```
 4. **Your .env file should work as-is**:
    ```bash
-   MONGODB_URI=mongodb://localhost:27017/samvad-civic-connect
+   MONGODB_URI=mongodb://localhost:27017/civiconnect
    ```
 
 ### Option 3: MongoDB with Docker
@@ -46,7 +46,7 @@
    ```
 3. **Use default connection string**:
    ```bash
-   MONGODB_URI=mongodb://localhost:27017/samvad-civic-connect
+   MONGODB_URI=mongodb://localhost:27017/civiconnect
    ```
 
 ## 🧪 Test Your Setup
@@ -60,7 +60,7 @@ npm run dev
 
 You should see:
 ```
-🚀 Samvad Civic Connect Backend Server Started!
+🚀 Civiconnect Backend Server Started!
 📊 MongoDB: Connected
 ```
 

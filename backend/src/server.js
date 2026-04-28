@@ -200,7 +200,7 @@ const seedAdminOnStartup = async () => {
 
 server.listen(PORT, async () => {
   logger.info(`
-🚀 Samvad Civic Connect Backend Server Started!
+🚀 Civiconnect Backend Server Started!
 📍 Environment: ${process.env.NODE_ENV}
 🔗 Port: ${PORT}
 📊 MongoDB: Connected

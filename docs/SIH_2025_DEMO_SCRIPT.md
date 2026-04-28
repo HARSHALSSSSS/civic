@@ -1,4 +1,4 @@
-# Samvad - SIH 2025 Demo Script
+# Civiconnect - SIH 2025 Demo Script
 
 ## 📋 Demo Overview
 **Duration:** 5-7 minutes  
@@ -14,7 +14,7 @@
 
 ### Phase 1: Setup (30 seconds)
 1. **Open two devices/browsers:**
-   - Mobile/Phone: Samvad Citizen App (React Native)
+   - Mobile/Phone: Civiconnect Citizen App (React Native)
    - Laptop: Government Admin Dashboard (Web)
 
 2. **Show starting state:**
@@ -78,7 +78,7 @@
 ## 🎤 Speaking Points
 
 ### Opening (10 seconds)
-> "Samvad revolutionizes civic engagement by enabling citizens to report issues in just 30 seconds while giving government officials powerful tools for efficient resolution."
+> "Civiconnect revolutionizes civic engagement by enabling citizens to report issues in just 30 seconds while giving government officials powerful tools for efficient resolution."
 
 ### During Citizen Demo
 > "Watch how our AI automatically categorizes this pothole report and routes it to the Public Works Department with 91% accuracy. No manual sorting needed."
