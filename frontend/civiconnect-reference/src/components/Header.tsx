@@ -6,7 +6,10 @@ import {
   Settings, 
   LogOut, 
   Menu,
-  X
+  X,
+  BarChart3,
+  HelpCircle,
+  Info
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -36,6 +39,29 @@ export const Header = ({ userRole, onNavigate, currentPage }: HeaderProps) => {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-6">
+            <Button
+              variant={currentPage === "about" ? "civic" : "ghost"}
+              size="sm"
+              onClick={() => onNavigate("about")}
+            >
+              About Us
+            </Button>
+            <Button
+              variant={currentPage === "analytics" ? "civic" : "ghost"}
+              size="sm"
+              onClick={() => onNavigate("analytics")}
+            >
+              <BarChart3 className="h-4 w-4 mr-1" />
+              Analytics
+            </Button>
+            <Button
+              variant={currentPage === "help" ? "civic" : "ghost"}
+              size="sm"
+              onClick={() => onNavigate("help")}
+            >
+              <HelpCircle className="h-4 w-4 mr-1" />
+              Help
+            </Button>
             {userRole === "citizen" && (
               <>
                 <Button
@@ -72,7 +98,11 @@ export const Header = ({ userRole, onNavigate, currentPage }: HeaderProps) => {
                 <span className="text-sm text-muted-foreground capitalize hidden sm:block">
                   {userRole}
                 </span>
-                <Button variant="ghost" size="icon">
+                <Button 
+                  variant={currentPage === "profile" ? "civic" : "ghost"} 
+                  size="icon"
+                  onClick={() => onNavigate("profile")}
+                >
                   <User className="h-5 w-5" />
                 </Button>
                 <Button
@@ -106,6 +136,42 @@ export const Header = ({ userRole, onNavigate, currentPage }: HeaderProps) => {
         {/* Mobile Navigation */}
         {isMobileMenuOpen && (
           <div className="md:hidden border-t border-border py-4 space-y-2">
+            <Button
+              variant={currentPage === "about" ? "civic" : "ghost"}
+              size="sm"
+              className="w-full justify-start"
+              onClick={() => {
+                onNavigate("about");
+                setIsMobileMenuOpen(false);
+              }}
+            >
+              <Info className="h-4 w-4 mr-2" />
+              About Us
+            </Button>
+            <Button
+              variant={currentPage === "analytics" ? "civic" : "ghost"}
+              size="sm"
+              className="w-full justify-start"
+              onClick={() => {
+                onNavigate("analytics");
+                setIsMobileMenuOpen(false);
+              }}
+            >
+              <BarChart3 className="h-4 w-4 mr-2" />
+              Public Analytics
+            </Button>
+            <Button
+              variant={currentPage === "help" ? "civic" : "ghost"}
+              size="sm"
+              className="w-full justify-start"
+              onClick={() => {
+                onNavigate("help");
+                setIsMobileMenuOpen(false);
+              }}
+            >
+              <HelpCircle className="h-4 w-4 mr-2" />
+              Help & FAQ
+            </Button>
             {userRole === "citizen" && (
               <>
                 <Button
@@ -143,6 +209,20 @@ export const Header = ({ userRole, onNavigate, currentPage }: HeaderProps) => {
                 }}
               >
                 Admin Dashboard
+              </Button>
+            )}
+            {userRole && (
+              <Button
+                variant={currentPage === "profile" ? "civic" : "ghost"}
+                size="sm"
+                className="w-full justify-start"
+                onClick={() => {
+                  onNavigate("profile");
+                  setIsMobileMenuOpen(false);
+                }}
+              >
+                <User className="h-4 w-4 mr-2" />
+                Profile & Settings
               </Button>
             )}
             {userRole && (
