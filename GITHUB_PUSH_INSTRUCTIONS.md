@@ -11,7 +11,7 @@
 1. Go to [GitHub.com](https://github.com)
 2. Click the **"+"** button → **"New repository"**
 3. Repository settings:
-   - **Name**: `samvad-civic-connect-platform`
+   - **Name**: `civiconnect-platform`
    - **Description**: `Full-stack civic engagement platform connecting citizens with local government`
    - **Visibility**: Public ✅ (recommended)
    - **Initialize with README**: ❌ NO (we already have one)
@@ -25,7 +25,7 @@ Replace `YOUR_USERNAME` with your actual GitHub username:
 
 ```bash
 # Add the GitHub repository as remote origin
-git remote add origin https://github.com/YOUR_USERNAME/samvad-civic-connect-platform.git
+git remote add origin https://github.com/YOUR_USERNAME/civiconnect-platform.git
 
 # Push your code to GitHub
 git push -u origin main
@@ -33,7 +33,7 @@ git push -u origin main
 
 **Example (replace with your username):**
 ```bash
-git remote add origin https://github.com/0Harsha03/samvad-civic-connect-platform.git
+git remote add origin https://github.com/0Harsha03/civiconnect-platform.git
 git push -u origin main
 ```
 
@@ -49,14 +49,14 @@ When you run `git push`, GitHub will ask for authentication:
 
 ### 4. SSH Alternative (if you have SSH keys)
 ```bash
-git remote add origin git@github.com:YOUR_USERNAME/samvad-civic-connect-platform.git
+git remote add origin git@github.com:YOUR_USERNAME/civiconnect-platform.git
 git push -u origin main
 ```
 
 ## 🎉 After Success
 Your repository will be live at:
 ```
-https://github.com/YOUR_USERNAME/samvad-civic-connect-platform
+https://github.com/YOUR_USERNAME/civiconnect-platform
 ```
 
 ## 📦 What's Being Pushed
@@ -72,4 +72,4 @@ https://github.com/YOUR_USERNAME/samvad-civic-connect-platform
 - **Push rejected**: Make sure the repository is empty (no README/gitignore)
 
 ---
-**Your Samvad Civic Connect Platform is ready for the world! 🌍**
+**Your Civiconnect Platform is ready for the world! 🌍**

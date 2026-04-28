@@ -1,4 +1,4 @@
-# 🚀 Samvad Civic Connect - Complete Application Guide
+# 🚀 Civiconnect - Complete Application Guide
 
 ## Current Status
 
@@ -19,7 +19,7 @@
 
 ```bash
 # Navigate to backend
-cd C:\Users\shars\Documents\samvad-civic-platform\backend
+cd C:\Users\shars\Documents\civiconnect-platform\backend
 
 # Start the backend server
 npm run dev
@@ -27,7 +27,7 @@ npm run dev
 
 **Expected Output:**
 ```
-🚀 Samvad Civic Connect Backend Server Started!
+🚀 Civiconnect Backend Server Started!
 📍 Environment: development  
 🔗 Port: 5000
 📊 MongoDB: Connected
@@ -39,7 +39,7 @@ Open a **NEW** terminal window:
 
 ```bash
 # Navigate to frontend
-cd C:\Users\shars\Documents\samvad-civic-platform\frontend\samvad-reference
+cd C:\Users\shars\Documents\civiconnect-platform\frontend\civiconnect-reference
 
 # Start the frontend server
 npm run dev

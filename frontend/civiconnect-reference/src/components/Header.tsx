@@ -31,7 +31,7 @@ export const Header = ({ userRole, onNavigate, currentPage }: HeaderProps) => {
             <div className="w-8 h-8 bg-gradient-hero rounded-lg flex items-center justify-center">
               <MessageSquare className="h-5 w-5 text-white" />
             </div>
-            <span className="text-xl font-bold text-foreground">Samvad</span>
+            <span className="text-xl font-bold text-foreground">Civiconnect</span>
           </div>
 
           {/* Desktop Navigation */}

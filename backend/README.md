@@ -1,6 +1,6 @@
-# Samvad Civic Connect - Backend API
+# Civiconnect - Backend API
 
-A comprehensive backend API for the Samvad Civic Connect platform, enabling citizens to report civic issues and government staff to manage and resolve them efficiently.
+A comprehensive backend API for the Civiconnect platform, enabling citizens to report civic issues and government staff to manage and resolve them efficiently.
 
 ## 🚀 Features
 
@@ -25,7 +25,7 @@ A comprehensive backend API for the Samvad Civic Connect platform, enabling citi
 1. **Clone the repository**
    ```bash
    git clone <repository-url>
-   cd samvad-civic-platform/backend
+   cd civiconnect-platform/backend
    ```
 
 2. **Install dependencies**
@@ -221,7 +221,7 @@ src/
 |----------|-------------|---------|
 | `PORT` | Server port | 5000 |
 | `NODE_ENV` | Environment | development |
-| `MONGODB_URI` | MongoDB connection string | mongodb://localhost:27017/samvad-civic-connect |
+| `MONGODB_URI` | MongoDB connection string | mongodb://localhost:27017/civiconnect |
 | `JWT_SECRET` | JWT secret key | Required |
 | `JWT_EXPIRE` | JWT expiration time | 7d |
 | `MAX_FILE_SIZE` | Max upload file size in bytes | 5242880 (5MB) |

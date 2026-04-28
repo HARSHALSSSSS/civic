@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Samvad Civic App Design System - All colors MUST be HSL */
+/* Civiconnect Civic App Design System - All colors MUST be HSL */
 
 @layer base {
   :root {

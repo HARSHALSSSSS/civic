@@ -24,7 +24,7 @@ export const Hero = ({ onNavigate }: HeroProps) => {
           {/* Logo Badge */}
           <div className="inline-flex items-center gap-2 bg-primary-light rounded-full px-4 py-2 mb-8">
             <MessageSquare className="h-5 w-5 text-primary" />
-            <span className="text-sm font-semibold text-primary">Samvad - Civic Reporting</span>
+            <span className="text-sm font-semibold text-primary">Civiconnect - Civic Reporting</span>
           </div>
 
           {/* Main Heading */}

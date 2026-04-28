@@ -110,7 +110,7 @@ export const Login = ({ onLogin }: LoginProps) => {
             <div className="w-12 h-12 bg-gradient-hero rounded-xl flex items-center justify-center">
               <MessageSquare className="h-6 w-6 text-white" />
             </div>
-            <span className="text-2xl font-bold text-foreground">Samvad</span>
+            <span className="text-2xl font-bold text-foreground">Civiconnect</span>
           </div>
           <p className="text-muted-foreground">Sign in to report civic issues</p>
         </div>

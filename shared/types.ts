@@ -1,4 +1,4 @@
-// Shared TypeScript types for Samvad Platform
+// Shared TypeScript types for Civiconnect Platform
 
 export interface User {
   id: string;

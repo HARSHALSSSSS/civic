@@ -1,7 +1,7 @@
 {
-  "name": "samvad-civic-connect-backend",
+  "name": "civiconnect-backend",
   "version": "1.0.0",
-  "description": "Backend API for Samvad Civic Connect - A civic engagement platform",
+  "description": "Backend API for Civiconnect - A civic engagement platform",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
@@ -48,7 +48,7 @@
     "express",
     "mongodb"
   ],
-  "author": "Samvad Civic Connect Team",
+  "author": "Civiconnect Team",
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0"

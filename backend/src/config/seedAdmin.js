@@ -1,7 +1,7 @@
 const User = require('../models/User');
 const logger = require('./logger');
 
-const DEFAULT_ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@samvad.gov.in';
+const DEFAULT_ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@civiconnect.gov.in';
 const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Admin@123';
 const DEFAULT_ADMIN_NAME = process.env.ADMIN_NAME || 'System Administrator';
 
