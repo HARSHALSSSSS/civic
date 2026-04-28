@@ -8,6 +8,10 @@ import { Login } from "@/pages/Login";
 import { ReportIssue } from "@/pages/ReportIssue";
 import { CitizenDashboard } from "@/pages/CitizenDashboard";
 import { AdminDashboard } from "@/pages/AdminDashboard";
+import { AboutUs } from "@/pages/AboutUs";
+import { PublicAnalytics } from "@/pages/PublicAnalytics";
+import { HelpFAQ } from "@/pages/HelpFAQ";
+import { ProfileSettings } from "@/pages/ProfileSettings";
 import { mockReports } from "@/services/mockData";
 import { apiService } from "@/services/apiService";
 import { Report } from "@/types";
@@ -218,7 +222,7 @@ const Index = () => {
       setUser(null);
       setReports([]); // Clear reports on logout
       setCurrentPage("home");
-    } else if ((page === "report" || page === "dashboard") && !user) {
+    } else if ((page === "report" || page === "dashboard" || page === "profile") && !user) {
       setCurrentPage("login");
     } else if (page === "admin" && user?.role !== "staff") {
       setCurrentPage("login");
@@ -340,6 +344,18 @@ const Index = () => {
             onUpdateReport={handleUpdateReport}
           />
         ) : null;
+      
+      case "about":
+        return <AboutUs />;
+      
+      case "analytics":
+        return <PublicAnalytics />;
+      
+      case "help":
+        return <HelpFAQ />;
+      
+      case "profile":
+        return user ? <ProfileSettings user={user} /> : null;
       
       default:
         return <Hero onNavigate={handleNavigate} />;
