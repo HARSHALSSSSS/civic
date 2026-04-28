@@ -57,6 +57,36 @@ const MyIssuesScreen: React.FC<MyIssuesScreenProps> = ({ navigation }) => {
     setRefreshing(false);
   }, [user]);
 
+  const handleSupport = async (issueId: string) => {
+    try {
+      const token = await apiService.getToken();
+      if (!token) {
+        Alert.alert('Error', 'Please login to support issues');
+        return;
+      }
+      
+      const response = await fetch(`http://localhost:5000/api/reports/${issueId}/support`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        // Update the issue in the local state
+        setIssues(prev => prev.map(issue => 
+          issue.id === issueId 
+            ? { ...issue, supportCount: data.supportCount, hasSupported: data.hasSupported }
+            : issue
+        ));
+      }
+    } catch (error) {
+      console.error('Support error:', error);
+    }
+  };
+
   const getStatusColor = (status: Issue['status']) => {
     switch (status) {
       case 'Reported':
@@ -119,6 +149,18 @@ const MyIssuesScreen: React.FC<MyIssuesScreenProps> = ({ navigation }) => {
         <Text style={styles.dateText}>
           {formatDate(item.createdAt)}
         </Text>
+      </View>
+      
+      {/* Support/Upvote Section */}
+      <View style={styles.supportSection}>
+        <TouchableOpacity 
+          style={styles.supportButton}
+          onPress={() => handleSupport(item.id)}
+        >
+          <Text style={styles.supportIcon}>👍</Text>
+          <Text style={styles.supportCount}>{item.supportCount || 0}</Text>
+        </TouchableOpacity>
+        <Text style={styles.supportLabel}>Community Support</Text>
       </View>
       
       {item.adminNotes && (
@@ -258,6 +300,36 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   dateText: {
+    fontSize: 12,
+    color: '#95a5a6',
+  },
+  supportSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#ecf0f1',
+  },
+  supportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff5f5',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginRight: 8,
+  },
+  supportIcon: {
+    fontSize: 16,
+    marginRight: 4,
+  },
+  supportCount: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#e74c3c',
+  },
+  supportLabel: {
     fontSize: 12,
     color: '#95a5a6',
   },

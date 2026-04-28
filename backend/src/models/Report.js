@@ -148,6 +148,16 @@ const reportSchema = new mongoose.Schema({
   isPublic: {
     type: Boolean,
     default: true
+  },
+
+  // Community support (upvotes)
+  supports: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  supportCount: {
+    type: Number,
+    default: 0
   }
 }, {
   timestamps: true
@@ -161,6 +171,7 @@ reportSchema.index({ status: 1, priority: -1, createdAt: -1 });
 reportSchema.index({ citizenId: 1, createdAt: -1 });
 reportSchema.index({ assignedStaffId: 1, status: 1 });
 reportSchema.index({ category: 1, status: 1 });
+reportSchema.index({ supportCount: -1 });
 
 // Virtual for getting latitude and longitude separately
 reportSchema.virtual('latitude').get(function() {

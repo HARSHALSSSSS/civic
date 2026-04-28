@@ -6,8 +6,13 @@ const {
   getReport,
   updateReport,
   deleteReport,
-  submitFeedback
+  submitFeedback,
+  toggleSupport,
+  getNotifications,
+  markNotificationRead,
+  markAllNotificationsRead
 } = require('../controllers/reportController');
+const { getAdvancedAnalytics, getStats } = require('../controllers/analyticsController');
 const { protect, optionalAuth } = require('../middleware/auth');
 const { upload, processImages } = require('../middleware/upload');
 const Report = require('../models/Report');
@@ -168,5 +173,17 @@ router.route('/:id')
   .delete(protect, deleteReport);
 
 router.post('/:id/feedback', protect, feedbackValidation, submitFeedback);
+
+// Support (upvote) routes
+router.post('/:id/support', protect, toggleSupport);
+
+// Notification routes
+router.get('/notifications', protect, getNotifications);
+router.put('/notifications/:id/read', protect, markNotificationRead);
+router.put('/notifications/read-all', protect, markAllNotificationsRead);
+
+// Analytics routes
+router.get('/analytics/advanced', protect, getAdvancedAnalytics);
+router.get('/analytics/stats', getStats);
 
 module.exports = router;

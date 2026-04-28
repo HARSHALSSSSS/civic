@@ -1,8 +1,34 @@
 const { validationResult } = require('express-validator');
 const Report = require('../models/Report');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 const logger = require('../config/logger');
 const { deleteFile } = require('../middleware/upload');
+const aiService = require('../services/aiService');
+
+// Get io instance for real-time notifications
+let io = null;
+const setIO = (socketIO) => {
+  io = socketIO;
+};
+
+// Emit notification helper
+const emitNotification = async (userId, notificationData) => {
+  try {
+    const notification = await Notification.create({
+      userId,
+      ...notificationData
+    });
+    
+    if (io) {
+      io.to(`user_${userId}`).emit('notification', notification);
+    }
+    
+    return notification;
+  } catch (error) {
+    logger.error(`Failed to emit notification: ${error.message}`);
+  }
+};
 
 // @desc    Create new report
 // @route   POST /api/reports
@@ -39,12 +65,32 @@ const createReport = async (req, res, next) => {
       reportData.photos = req.processedFiles;
     }
 
+    // Run AI analysis on the report
+    const aiAnalysis = await aiService.analyzeReport(title, description, parseInt(priority));
+    reportData.aiSuggestions = {
+      suggestedCategory: aiAnalysis.suggestedCategory,
+      suggestedPriority: aiAnalysis.suggestedPriority,
+      confidence: aiAnalysis.confidence,
+      processedAt: aiAnalysis.processedAt
+    };
+
     const report = await Report.create(reportData);
 
     // Populate citizen information
     await report.populate('citizenId', 'name email');
 
-    logger.info(`New report created: ${report.reportId} by ${req.user.email}`);
+    logger.info(`New report created: ${report.reportId} by ${req.user.email} - AI confidence: ${aiAnalysis.confidence}`);
+
+    // Notify admin users of new report
+    const adminUsers = await User.find({ role: 'admin', isActive: true });
+    for (const admin of adminUsers) {
+      await emitNotification(admin._id, {
+        type: 'report_created',
+        title: 'New Report Submitted',
+        message: `A new ${report.category} report "${report.title}" has been submitted and requires attention.`,
+        reportId: report._id
+      });
+    }
 
     res.status(201).json({
       success: true,
@@ -403,11 +449,153 @@ const submitFeedback = async (req, res, next) => {
   }
 };
 
+// @desc    Toggle support (upvote) on a report
+// @route   POST /api/reports/:id/support
+// @access  Private (Authenticated users)
+const toggleSupport = async (req, res, next) => {
+  try {
+    const report = await Report.findById(req.params.id);
+
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        message: 'Report not found'
+      });
+    }
+
+    const userId = req.user.id;
+    const hasSupported = report.supports.includes(userId);
+
+    if (hasSupported) {
+      // Remove support
+      report.supports = report.supports.filter(id => id.toString() !== userId);
+      report.supportCount = Math.max(0, report.supportCount - 1);
+    } else {
+      // Add support
+      report.supports.push(userId);
+      report.supportCount += 1;
+    }
+
+    await report.save();
+
+    // Notify report owner if someone else supports
+    if (report.citizenId.toString() !== userId) {
+      const supporter = await User.findById(userId);
+      await emitNotification(report.citizenId, {
+        type: 'support_added',
+        title: 'Your Report Received Support',
+        message: `${supporter.name} supported your report "${report.title}".`,
+        reportId: report._id,
+        metadata: {
+          supporterName: supporter.name,
+          newSupportCount: report.supportCount
+        }
+      });
+    }
+
+    logger.info(`Support toggled for report: ${report.reportId} by ${req.user.email} - Count: ${report.supportCount}`);
+
+    res.json({
+      success: true,
+      message: hasSupported ? 'Support removed' : 'Support added',
+      supportCount: report.supportCount,
+      hasSupported: !hasSupported
+    });
+
+  } catch (error) {
+    logger.error(`Toggle support error: ${error.message}`);
+    next(error);
+  }
+};
+
+// @desc    Get notifications for current user
+// @route   GET /api/reports/notifications
+// @access  Private
+const getNotifications = async (req, res, next) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 20;
+    const skip = (page - 1) * limit;
+
+    const notifications = await Notification.getRecent(req.user.id, limit);
+    const unreadCount = await Notification.getUnreadCount(req.user.id);
+    const total = await Notification.countDocuments({ userId: req.user.id });
+
+    res.json({
+      success: true,
+      data: {
+        notifications,
+        unreadCount,
+        total,
+        pages: Math.ceil(total / limit),
+        currentPage: page
+      }
+    });
+
+  } catch (error) {
+    logger.error(`Get notifications error: ${error.message}`);
+    next(error);
+  }
+};
+
+// @desc    Mark notification as read
+// @route   PUT /api/reports/notifications/:id/read
+// @access  Private
+const markNotificationRead = async (req, res, next) => {
+  try {
+    const notification = await Notification.findOne({
+      _id: req.params.id,
+      userId: req.user.id
+    });
+
+    if (!notification) {
+      return res.status(404).json({
+        success: false,
+        message: 'Notification not found'
+      });
+    }
+
+    await notification.markAsRead();
+
+    res.json({
+      success: true,
+      message: 'Notification marked as read'
+    });
+
+  } catch (error) {
+    logger.error(`Mark notification read error: ${error.message}`);
+    next(error);
+  }
+};
+
+// @desc    Mark all notifications as read
+// @route   PUT /api/reports/notifications/read-all
+// @access  Private
+const markAllNotificationsRead = async (req, res, next) => {
+  try {
+    await Notification.markAllAsRead(req.user.id);
+
+    res.json({
+      success: true,
+      message: 'All notifications marked as read'
+    });
+
+  } catch (error) {
+    logger.error(`Mark all notifications read error: ${error.message}`);
+    next(error);
+  }
+};
+
 module.exports = {
   createReport,
   getReports,
   getReport,
   updateReport,
   deleteReport,
-  submitFeedback
+  submitFeedback,
+  toggleSupport,
+  getNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+  setIO
 };

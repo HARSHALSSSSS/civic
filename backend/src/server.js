@@ -5,6 +5,8 @@ const compression = require('compression');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
+const { Server } = require('socket.io');
 
 // Load env vars
 require('dotenv').config();
@@ -13,6 +15,7 @@ require('dotenv').config();
 const connectDB = require('./config/database');
 const logger = require('./config/logger');
 const errorHandler = require('./middleware/error');
+const seedAdmin = require('./config/seedAdmin');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -121,7 +124,81 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-const server = app.listen(PORT, () => {
+// Create HTTP server for Socket.io
+const server = http.createServer(app);
+
+// Initialize Socket.io
+const io = new Server(server, {
+  cors: {
+    origin: process.env.NODE_ENV === 'development' ? '*' : process.env.FRONTEND_URL,
+    methods: ['GET', 'POST'],
+    credentials: true
+  }
+});
+
+// Socket.io authentication middleware
+io.use(async (socket, next) => {
+  const token = socket.handshake.auth.token || socket.handshake.query.token;
+  
+  if (!token) {
+    return next(new Error('Authentication required'));
+  }
+
+  try {
+    const jwt = require('jsonwebtoken');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const User = require('./models/User');
+    const user = await User.findById(decoded.id);
+    
+    if (!user || !user.isActive) {
+      return next(new Error('Invalid user'));
+    }
+    
+    socket.user = {
+      id: user._id.toString(),
+      email: user.email,
+      role: user.role
+    };
+    next();
+  } catch (error) {
+    next(new Error('Invalid token'));
+  }
+});
+
+// Socket.io connection handling
+io.on('connection', (socket) => {
+  logger.info(`Socket connected: ${socket.user.email} (${socket.id})`);
+  
+  // Join user-specific room
+  socket.join(`user_${socket.user.id}`);
+  
+  // Join role-based rooms
+  if (socket.user.role === 'admin' || socket.user.role === 'staff') {
+    socket.join('staff_room');
+  }
+  
+  socket.on('disconnect', () => {
+    logger.info(`Socket disconnected: ${socket.user.email}`);
+  });
+});
+
+// Make io available to controllers
+const reportController = require('./controllers/reportController');
+reportController.setIO(io);
+
+// Export io for use in other modules
+module.exports.io = io;
+
+// Seed admin user after database connection
+const seedAdminOnStartup = async () => {
+  try {
+    await seedAdmin();
+  } catch (error) {
+    logger.error(`Admin seeding failed: ${error.message}`);
+  }
+};
+
+server.listen(PORT, async () => {
   logger.info(`
 🚀 Samvad Civic Connect Backend Server Started!
 📍 Environment: ${process.env.NODE_ENV}
@@ -130,16 +207,16 @@ const server = app.listen(PORT, () => {
 🛡️  Security: Enabled
 📁 Uploads: /api/uploads
 ⚡ Health Check: /health
+🔌 Socket.io: Enabled
   `);
+  
+  // Seed admin after server starts
+  await seedAdminOnStartup();
 });
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err, promise) => {
   logger.error(`Unhandled Rejection: ${err.message}`);
-  // Close server & exit process
-  server.close(() => {
-    process.exit(1);
-  });
 });
 
 // Handle uncaught exceptions
@@ -148,4 +225,4 @@ process.on('uncaughtException', (err) => {
   process.exit(1);
 });
 
-module.exports = app;
+module.exports = { app, server, io };

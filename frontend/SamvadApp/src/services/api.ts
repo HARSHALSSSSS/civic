@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Change this to your backend URL when running
-const BASE_URL = 'http://localhost:3000/api';
+const BASE_URL = 'http://localhost:5000/api';
 
 interface ApiResponse<T = any> {
   success: boolean;
@@ -24,8 +24,8 @@ interface Issue {
   id: string;
   title: string;
   description: string;
-  category: 'Pothole' | 'Drainage' | 'Streetlight' | 'Other';
-  status: 'Reported' | 'In Progress' | 'Resolved' | 'Rejected';
+  category: 'Pothole' | 'Waste' | 'Light' | 'Water' | 'Traffic' | 'Other';
+  status: 'Submitted' | 'Assigned' | 'In Progress' | 'Resolved' | 'Closed' | 'Rejected';
   location: {
     latitude: number;
     longitude: number;
@@ -35,6 +35,8 @@ interface Issue {
   citizenId: string;
   assignedDepartment?: string;
   adminNotes?: string;
+  supportCount?: number;
+  hasSupported?: boolean;
   createdAt: string;
   updatedAt: string;
   resolvedAt?: string;
@@ -46,6 +48,14 @@ class ApiService {
       return await AsyncStorage.getItem('auth_token');
     } catch (error) {
       console.error('Error getting auth token:', error);
+      return null;
+    }
+  }
+
+  async getToken(): Promise<string | null> {
+    try {
+      return await AsyncStorage.getItem('auth_token');
+    } catch (error) {
       return null;
     }
   }
@@ -113,13 +123,67 @@ class ApiService {
     }
   }
 
-  // Issues
+  // Issues - maps to reports endpoint
   async getIssues(userId?: string, userType?: 'citizen' | 'admin'): Promise<ApiResponse<Issue[]>> {
-    const params = new URLSearchParams();
-    if (userId) params.append('userId', userId);
-    if (userType) params.append('userType', userType);
-    
-    return this.makeRequest<Issue[]>(`/issues?${params.toString()}`);
+    try {
+      // For citizens, use the /reports/my endpoint
+      if (userType === 'citizen') {
+        const response = await this.makeRequest<{ reports: any[] }>('/reports/my');
+        if (response.success && response.data) {
+          // Transform reports to Issue format
+          const issues = response.data.reports.map((report: any) => ({
+            id: report._id,
+            title: report.title,
+            description: report.description,
+            category: report.category,
+            status: report.status,
+            location: {
+              latitude: report.location?.coordinates?.[1] || 0,
+              longitude: report.location?.coordinates?.[0] || 0,
+              address: report.location?.address
+            },
+            photoUrl: report.photos?.[0]?.url,
+            citizenId: report.citizenId?._id,
+            assignedDepartment: report.assignedStaffId?.department,
+            adminNotes: report.staffComments?.[0]?.comment,
+            supportCount: report.supportCount || 0,
+            createdAt: report.createdAt,
+            updatedAt: report.updatedAt
+          }));
+          return { success: true, data: issues };
+        }
+        return response;
+      }
+      
+      // For admin, use /reports/admin
+      const response = await this.makeRequest<{ reports: any[] }>('/reports/admin');
+      if (response.success && response.data) {
+        const issues = response.data.reports.map((report: any) => ({
+          id: report._id,
+          title: report.title,
+          description: report.description,
+          category: report.category,
+          status: report.status,
+          location: {
+            latitude: report.location?.coordinates?.[1] || 0,
+            longitude: report.location?.coordinates?.[0] || 0,
+            address: report.location?.address
+          },
+          photoUrl: report.photos?.[0]?.url,
+          citizenId: report.citizenId?._id,
+          assignedDepartment: report.assignedStaffId?.department,
+          adminNotes: report.staffComments?.[0]?.comment,
+          supportCount: report.supportCount || 0,
+          createdAt: report.createdAt,
+          updatedAt: report.updatedAt
+        }));
+        return { success: true, data: issues };
+      }
+      return response;
+    } catch (error) {
+      console.error('Error fetching issues:', error);
+      return { success: false, error: 'Failed to fetch issues' };
+    }
   }
 
   async createIssue(issueData: {
@@ -131,7 +195,7 @@ class ApiService {
     photoUrl?: string;
     citizenId: string;
   }): Promise<ApiResponse<Issue>> {
-    return this.makeRequest<Issue>('/issues', {
+    return this.makeRequest<Issue>('/reports', {
       method: 'POST',
       body: JSON.stringify(issueData),
     });
@@ -145,14 +209,14 @@ class ApiService {
       assignedDepartment?: string;
     }
   ): Promise<ApiResponse<Issue>> {
-    return this.makeRequest<Issue>(`/issues/${issueId}`, {
+    return this.makeRequest<Issue>(`/reports/${issueId}`, {
       method: 'PUT',
       body: JSON.stringify(updateData),
     });
   }
 
   async getIssueById(issueId: string): Promise<ApiResponse<Issue>> {
-    return this.makeRequest<Issue>(`/issues/${issueId}`);
+    return this.makeRequest<Issue>(`/reports/${issueId}`);
   }
 }
 
