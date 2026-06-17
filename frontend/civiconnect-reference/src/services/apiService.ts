@@ -1,4 +1,5 @@
 import { API_CONFIG, getAuthHeaders, getUploadHeaders } from '../config/api';
+import { fetchJson } from '../lib/apiFetch';
 
 async function parseResponse(response: Response) {
   let data: Record<string, unknown> | null = null;
@@ -22,6 +23,13 @@ async function parseResponse(response: Response) {
   return data ?? {};
 }
 
+function saveSession(data: Record<string, unknown>) {
+  if (data.token) {
+    localStorage.setItem('authToken', String(data.token));
+    localStorage.setItem('userData', JSON.stringify(data.user));
+  }
+}
+
 export class ApiService {
   private baseUrl = API_CONFIG.BASE_URL;
 
@@ -30,30 +38,30 @@ export class ApiService {
   }
 
   async login(email: string, password: string) {
-    const response = await fetch(`${this.baseUrl}${API_CONFIG.ENDPOINTS.LOGIN}`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify({ email, password }),
-    });
-    const data = await parseResponse(response);
-    if (data.token) {
-      localStorage.setItem('authToken', data.token);
-      localStorage.setItem('userData', JSON.stringify(data.user));
-    }
+    const data = await fetchJson<Record<string, unknown>>(
+      `${this.baseUrl}${API_CONFIG.ENDPOINTS.LOGIN}`,
+      {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ email, password }),
+      },
+      { timeoutMs: 50_000, retries: 1 }
+    );
+    saveSession(data);
     return data;
   }
 
   async register(userData: Record<string, unknown>) {
-    const response = await fetch(`${this.baseUrl}${API_CONFIG.ENDPOINTS.REGISTER}`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-      body: JSON.stringify(userData),
-    });
-    const data = await parseResponse(response);
-    if (data.token) {
-      localStorage.setItem('authToken', data.token);
-      localStorage.setItem('userData', JSON.stringify(data.user));
-    }
+    const data = await fetchJson<Record<string, unknown>>(
+      `${this.baseUrl}${API_CONFIG.ENDPOINTS.REGISTER}`,
+      {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(userData),
+      },
+      { timeoutMs: 50_000, retries: 1 }
+    );
+    saveSession(data);
     return data;
   }
 

@@ -6,6 +6,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MessageSquare, UserPlus, AlertCircle, ArrowLeft } from "lucide-react";
 import { apiService } from "@/services/apiService";
+import { useBackendWarmup } from "@/hooks/useBackendWarmup";
+import { ServerStatusBanner } from "@/components/ServerStatusBanner";
+import { warmupBackend } from "@/lib/apiFetch";
 
 interface RegisterProps {
   onLogin: (user: { id: string; name: string; role: "citizen" | "staff" }) => void;
@@ -19,7 +22,9 @@ export const Register = ({ onLogin, onNavigate }: RegisterProps) => {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingLabel, setLoadingLabel] = useState("Creating account…");
   const [error, setError] = useState("");
+  const { status, retryWarmup } = useBackendWarmup();
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +46,10 @@ export const Register = ({ onLogin, onNavigate }: RegisterProps) => {
     }
 
     setIsLoading(true);
+    setLoadingLabel("Creating account…");
+    setError("");
     try {
+      await warmupBackend(true);
       const response = await apiService.register({
         name: name.trim(),
         email: email.trim().toLowerCase(),
@@ -78,6 +86,13 @@ export const Register = ({ onLogin, onNavigate }: RegisterProps) => {
           </div>
           <p className="text-muted-foreground">Create your citizen account</p>
         </div>
+
+        <ServerStatusBanner
+          status={status}
+          loading={isLoading}
+          loadingLabel={loadingLabel}
+          onRetry={retryWarmup}
+        />
 
         <Card>
           <CardHeader>

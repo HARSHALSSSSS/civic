@@ -122,11 +122,12 @@ const login = async (req, res, next) => {
       });
     }
 
-    // Update last login
+    // Update last login (non-blocking — respond to client immediately)
     user.lastLogin = new Date();
-    await user.save({ validateBeforeSave: false });
+    user.save({ validateBeforeSave: false }).catch((err) => {
+      logger.warn(`Failed to update lastLogin for ${user.email}: ${err.message}`);
+    });
 
-    // Generate token
     const token = generateToken(user._id);
 
     logger.info(`User logged in: ${user.email}`);

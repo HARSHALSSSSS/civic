@@ -7,6 +7,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MessageSquare, User, Shield, AlertCircle } from "lucide-react";
 import { apiService } from "@/services/apiService";
+import { useBackendWarmup } from "@/hooks/useBackendWarmup";
+import { ServerStatusBanner } from "@/components/ServerStatusBanner";
+import { warmupBackend } from "@/lib/apiFetch";
 
 interface LoginProps {
   onLogin: (user: { id: string; name: string; role: "citizen" | "staff" }) => void;
@@ -17,90 +20,84 @@ export const Login = ({ onLogin, onNavigate }: LoginProps) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingLabel, setLoadingLabel] = useState("Signing in…");
   const [error, setError] = useState<string>("");
+  const { status, retryWarmup } = useBackendWarmup();
 
-  const handleLogin = async (role: "citizen" | "staff") => {
-    setIsLoading(true);
-    setError("");
-    
-    // Validation
+  const completeLogin = (response: Record<string, unknown>) => {
+    const user = response.user as Record<string, unknown> | undefined;
+    if (response.success && user) {
+      onLogin({
+        id: String(user._id || user.id),
+        name: String(user.name),
+        role: user.role === "staff" || user.role === "admin" ? "staff" : "citizen",
+      });
+      return true;
+    }
+    return false;
+  };
+
+  const handleLogin = async (_role: "citizen" | "staff") => {
     if (!email || !password) {
       setError("Please fill in all fields");
-      setIsLoading(false);
       return;
     }
 
+    setIsLoading(true);
+    setLoadingLabel("Signing in…");
+    setError("");
+
     try {
-      const response = await apiService.login(email, password);
-      
-      if (response.success && response.user) {
-        onLogin({
-          id: response.user._id || response.user.id,
-          name: response.user.name,
-          role: response.user.role === "staff" || response.user.role === "admin" ? "staff" : "citizen"
-        });
-      } else {
+      await warmupBackend(true);
+      const response = await apiService.login(email.trim(), password);
+
+      if (!completeLogin(response as Record<string, unknown>)) {
         setError("Login failed. Please check your credentials.");
       }
-    } catch (error: unknown) {
-      console.error('Login error:', error);
-      setError(error instanceof Error ? error.message : "Login failed. Please try again.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Login failed. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
   const quickLogin = async (role: "citizen" | "staff") => {
     setIsLoading(true);
+    setLoadingLabel(role === "citizen" ? "Loading demo citizen…" : "Loading government portal…");
     setError("");
-    
+
+    const credentials =
+      role === "citizen"
+        ? { email: "test@example.com", password: "password123" }
+        : { email: "admin@civiconnect.gov.in", password: "Admin@123" };
+
     try {
-      let email, password, registerPayload;
-      if (role === "citizen") {
-        email = "test@example.com";
-        password = "password123";
-        registerPayload = {
-          name: "Demo Citizen",
-          email,
-          password,
-          role: "citizen"
-        };
-      } else {
-        email = "admin@civiconnect.gov.in";
-        password = "Admin@123";
-        registerPayload = {
-          name: "Demo Staff",
-          email,
-          password,
-          role: "staff",
-          department: "general"
-        };
-      }
-      
-      let response;
+      await warmupBackend(true);
 
       try {
-        response = await apiService.login(email, password);
-      } catch {
-        await apiService.register(registerPayload);
-        response = await apiService.login(email, password);
+        const response = await apiService.login(credentials.email, credentials.password);
+        if (completeLogin(response as Record<string, unknown>)) return;
+      } catch (loginErr) {
+        if (role !== "citizen") throw loginErr;
       }
-      
-      if (response.success && response.user) {
-        onLogin({
-          id: response.user._id || response.user.id,
-          name: response.user.name,
-          role: response.user.role === "staff" || response.user.role === "admin" ? "staff" : "citizen"
+
+      if (role === "citizen") {
+        setLoadingLabel("Creating demo account…");
+        const registered = await apiService.register({
+          name: "Demo Citizen",
+          email: credentials.email,
+          password: credentials.password,
+          role: "citizen",
         });
-      } else {
-        setError("Quick login failed. Please make sure the backend is running.");
+        if (!completeLogin(registered as Record<string, unknown>)) {
+          setError("Quick login failed.");
+        }
       }
-    } catch (error: unknown) {
-      console.error('Quick login error:', error);
-      setError(error instanceof Error ? error.message : "Quick login failed. Please make sure the backend is running.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Quick login failed. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
   return (
@@ -118,6 +115,13 @@ export const Login = ({ onLogin, onNavigate }: LoginProps) => {
         </div>
 
         <Tabs defaultValue="citizen" className="space-y-6">
+          <ServerStatusBanner
+            status={status}
+            loading={isLoading}
+            loadingLabel={loadingLabel}
+            onRetry={retryWarmup}
+          />
+
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="citizen" className="flex items-center gap-2">
               <User className="h-4 w-4" />

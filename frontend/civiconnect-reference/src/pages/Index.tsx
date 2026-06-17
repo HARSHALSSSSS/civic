@@ -107,12 +107,12 @@ const Index = () => {
 
   const handleLogin = (userData: User) => {
     setUser(userData);
-    loadReports(userData);
     setCurrentPage(userData.role === "citizen" ? "dashboard" : "admin");
     toast({
       title: userData.role === "citizen" ? "Welcome!" : "Welcome back!",
       description: `Signed in as ${userData.name}`,
     });
+    void loadReports(userData);
   };
 
   const handleNavigate = async (page: string) => {
