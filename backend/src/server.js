@@ -36,14 +36,6 @@ if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
-// Connect to MongoDB (must succeed in production)
-connectDB().catch((error) => {
-  logger.error(`Database startup failed: ${error.message}`);
-  if (process.env.NODE_ENV === 'production') {
-    process.exit(1);
-  }
-});
-
 // Security middleware
 app.use(helmet({
   crossOriginResourcePolicy: false
@@ -87,7 +79,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Health check endpoint
+// Health check endpoint (no DB required)
 app.get('/health', (req, res) => {
   const dbConnected = isDatabaseConnected();
   res.status(dbConnected ? 200 : 503).json({
@@ -96,8 +88,22 @@ app.get('/health', (req, res) => {
     database: dbConnected ? 'connected' : 'disconnected',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV,
+    render: Boolean(process.env.RENDER),
     hasMongoUri: Boolean(process.env.MONGODB_URI),
+    hasJwtSecret: Boolean(process.env.JWT_SECRET),
   });
+});
+
+// Block API if database is down — avoids confusing 10s buffering timeouts
+app.use('/api', (req, res, next) => {
+  if (!isDatabaseConnected()) {
+    return res.status(503).json({
+      success: false,
+      message:
+        'Database unavailable. On Render, set MONGODB_URI and allow 0.0.0.0/0 in MongoDB Atlas Network Access.',
+    });
+  }
+  next();
 });
 
 // API routes
@@ -204,21 +210,30 @@ server.on('error', (err) => {
   process.exit(1);
 });
 
-server.listen(PORT, async () => {
-  logger.info(`
+const startServer = async () => {
+  try {
+    await connectDB();
+    await seedAdminOnStartup();
+
+    server.listen(PORT, () => {
+      logger.info(`
 🚀 Civiconnect Backend Server Started!
-📍 Environment: ${process.env.NODE_ENV}
+📍 Environment: ${process.env.NODE_ENV || 'development'}
 🔗 Port: ${PORT}
-📊 MongoDB: Connected
+📊 MongoDB: ${isDatabaseConnected() ? 'Connected' : 'Not connected'}
 🛡️  Security: Enabled
 📁 Uploads: /api/uploads
 ⚡ Health Check: /health
 🔌 Socket.io: Enabled
-  `);
-  
-  // Seed admin after server starts
-  await seedAdminOnStartup();
-});
+      `);
+    });
+  } catch (error) {
+    logger.error(`Server startup failed: ${error.message}`);
+    process.exit(1);
+  }
+};
+
+startServer();
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err, promise) => {

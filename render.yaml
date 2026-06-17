@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: civic-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_URL
+        value: https://civic-black.vercel.app
+      - key: MONGODB_URI
+        sync: false

@@ -1,7 +1,8 @@
 const mongoose = require('mongoose');
 const logger = require('./logger');
 
-const isProduction = process.env.NODE_ENV === 'production';
+const isDeployed = () =>
+  process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
 
 const connectDB = async () => {
   const uri = process.env.MONGODB_URI;
@@ -9,12 +10,15 @@ const connectDB = async () => {
   if (!uri) {
     const message = 'MONGODB_URI is not set in environment variables';
     logger.error(message);
-    if (isProduction) {
+    if (isDeployed()) {
       throw new Error(message);
     }
     logger.warn('Development mode: running without database');
     return false;
   }
+
+  // Fail immediately instead of buffering queries for 10s when disconnected
+  mongoose.set('bufferCommands', false);
 
   try {
     const conn = await mongoose.connect(uri, {
@@ -30,15 +34,10 @@ const connectDB = async () => {
     logger.error(`Error connecting to MongoDB: ${error.message}`);
     logger.info('Atlas checklist:');
     logger.info('1. Network Access → allow 0.0.0.0/0 (required for Render)');
-    logger.info('2. MONGODB_URI on Render includes /civiconnect database name');
-    logger.info('3. Username and password are correct in the connection string');
+    logger.info('2. MONGODB_URI includes /civiconnect before the query string');
+    logger.info('3. Username and password are correct (no extra spaces)');
 
-    if (isProduction) {
-      throw error;
-    }
-
-    logger.warn('Development mode: continuing without database');
-    return false;
+    throw error;
   }
 };
 
@@ -58,3 +57,4 @@ const isDatabaseConnected = () => mongoose.connection.readyState === 1;
 
 module.exports = connectDB;
 module.exports.isDatabaseConnected = isDatabaseConnected;
+module.exports.isDeployed = isDeployed;
