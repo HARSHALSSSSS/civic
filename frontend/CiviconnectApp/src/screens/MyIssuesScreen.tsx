@@ -59,28 +59,19 @@ const MyIssuesScreen: React.FC<MyIssuesScreenProps> = ({ navigation }) => {
 
   const handleSupport = async (issueId: string) => {
     try {
-      const token = await apiService.getToken();
-      if (!token) {
-        Alert.alert('Error', 'Please login to support issues');
-        return;
-      }
-      
-      const response = await fetch(`http://localhost:5000/api/reports/${issueId}/support`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        // Update the issue in the local state
-        setIssues(prev => prev.map(issue => 
-          issue.id === issueId 
-            ? { ...issue, supportCount: data.supportCount, hasSupported: data.hasSupported }
-            : issue
-        ));
+      const response = await apiService.toggleSupport(issueId);
+      if (response.success) {
+        setIssues((prev) =>
+          prev.map((issue) =>
+            issue.id === issueId
+              ? {
+                  ...issue,
+                  supportCount: response.data?.supportCount ?? issue.supportCount,
+                  hasSupported: response.data?.hasSupported ?? issue.hasSupported,
+                }
+              : issue
+          )
+        );
       }
     } catch (error) {
       console.error('Support error:', error);

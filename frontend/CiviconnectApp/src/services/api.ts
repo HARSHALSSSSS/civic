@@ -1,10 +1,18 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
 
-// Android emulator: 10.0.2.2 | iOS simulator: localhost | physical device: your PC LAN IP
+const PRODUCTION_API_URL = 'https://civic-backend-5qjq.onrender.com/api';
+const PRODUCTION_UPLOAD_BASE = 'https://civic-backend-5qjq.onrender.com';
+
+// Set true only when testing against a local backend
+const USE_LOCAL_BACKEND = false;
+
 const DEV_HOST = Platform.OS === 'android' ? '10.0.2.2' : 'localhost';
-const BASE_URL = `http://${DEV_HOST}:5000/api`;
-const UPLOAD_BASE = `http://${DEV_HOST}:5000`;
+const LOCAL_API_URL = `http://${DEV_HOST}:5000/api`;
+const LOCAL_UPLOAD_BASE = `http://${DEV_HOST}:5000`;
+
+export const BASE_URL = USE_LOCAL_BACKEND ? LOCAL_API_URL : PRODUCTION_API_URL;
+const UPLOAD_BASE = USE_LOCAL_BACKEND ? LOCAL_UPLOAD_BASE : PRODUCTION_UPLOAD_BASE;
 
 interface ApiResponse<T = unknown> {
   success: boolean;

@@ -1,7 +1,9 @@
 // API Configuration for Civiconnect
+const PRODUCTION_API_URL = 'https://civic-backend-5qjq.onrender.com/api';
+
 export const API_CONFIG = {
-  BASE_URL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
-  UPLOAD_BASE: (import.meta.env.VITE_API_URL || 'http://localhost:5000/api').replace('/api', ''),
+  BASE_URL: import.meta.env.VITE_API_URL || PRODUCTION_API_URL,
+  UPLOAD_BASE: (import.meta.env.VITE_API_URL || PRODUCTION_API_URL).replace('/api', ''),
   ENDPOINTS: {
     REGISTER: '/auth/register',
     LOGIN: '/auth/login',
