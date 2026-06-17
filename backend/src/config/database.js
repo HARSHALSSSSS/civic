@@ -1,42 +1,49 @@
 const mongoose = require('mongoose');
 const logger = require('./logger');
 
-const connectDB = async () => {
-  try {
-    if (!process.env.MONGODB_URI) {
-      logger.warn('No MONGODB_URI provided in environment variables');
-      logger.info('Running in demo mode - some features may not work without a database');
-      return;
-    }
+const isProduction = process.env.NODE_ENV === 'production';
 
-    const conn = await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
-      socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
+const connectDB = async () => {
+  const uri = process.env.MONGODB_URI;
+
+  if (!uri) {
+    const message = 'MONGODB_URI is not set in environment variables';
+    logger.error(message);
+    if (isProduction) {
+      throw new Error(message);
+    }
+    logger.warn('Development mode: running without database');
+    return false;
+  }
+
+  try {
+    const conn = await mongoose.connect(uri, {
+      serverSelectionTimeoutMS: 30000,
+      connectTimeoutMS: 30000,
+      socketTimeoutMS: 45000,
+      maxPoolSize: 10,
     });
-    
-    logger.info(`MongoDB Connected: ${conn.connection.host}`);
-    
-    // Graceful shutdown
-    process.on('SIGINT', async () => {
-      await mongoose.connection.close();
-      logger.info('MongoDB connection closed.');
-      process.exit(0);
-    });
-    
+
+    logger.info(`MongoDB Connected: ${conn.connection.host} / ${conn.connection.name}`);
+    return true;
   } catch (error) {
     logger.error(`Error connecting to MongoDB: ${error.message}`);
-    logger.warn('Failed to connect to MongoDB. Server will continue without database.');
-    logger.info('To fix this:');
-    logger.info('1. Install MongoDB locally, or');
-    logger.info('2. Use MongoDB Atlas (cloud), or');
-    logger.info('3. Update MONGODB_URI in your .env file');
-    // Don't exit the process, continue without DB
+    logger.info('Atlas checklist:');
+    logger.info('1. Network Access → allow 0.0.0.0/0 (required for Render)');
+    logger.info('2. MONGODB_URI on Render includes /civiconnect database name');
+    logger.info('3. Username and password are correct in the connection string');
+
+    if (isProduction) {
+      throw error;
+    }
+
+    logger.warn('Development mode: continuing without database');
+    return false;
   }
 };
 
-// Connection event listeners
 mongoose.connection.on('error', (err) => {
-  logger.error(`MongoDB connection error: ${err}`);
+  logger.error(`MongoDB connection error: ${err.message}`);
 });
 
 mongoose.connection.on('disconnected', () => {
@@ -47,4 +54,7 @@ mongoose.connection.on('reconnected', () => {
   logger.info('MongoDB reconnected');
 });
 
+const isDatabaseConnected = () => mongoose.connection.readyState === 1;
+
 module.exports = connectDB;
+module.exports.isDatabaseConnected = isDatabaseConnected;

@@ -13,6 +13,7 @@ require('dotenv').config();
 
 // Import config
 const connectDB = require('./config/database');
+const { isDatabaseConnected } = require('./config/database');
 const logger = require('./config/logger');
 const errorHandler = require('./middleware/error');
 const seedAdmin = require('./config/seedAdmin');
@@ -32,8 +33,13 @@ if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }
 
-// Connect to MongoDB
-connectDB();
+// Connect to MongoDB (must succeed in production)
+connectDB().catch((error) => {
+  logger.error(`Database startup failed: ${error.message}`);
+  if (process.env.NODE_ENV === 'production') {
+    process.exit(1);
+  }
+});
 
 // Security middleware
 app.use(helmet({
@@ -80,11 +86,14 @@ app.use((req, res, next) => {
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Server is healthy',
+  const dbConnected = isDatabaseConnected();
+  res.status(dbConnected ? 200 : 503).json({
+    success: dbConnected,
+    message: dbConnected ? 'Server is healthy' : 'Database not connected',
+    database: dbConnected ? 'connected' : 'disconnected',
     timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV
+    environment: process.env.NODE_ENV,
+    hasMongoUri: Boolean(process.env.MONGODB_URI),
   });
 });
 
