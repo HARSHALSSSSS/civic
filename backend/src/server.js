@@ -27,6 +27,9 @@ const staffRoutes = require('./routes/staff');
 // Initialize express
 const app = express();
 
+// Render/Heroku/nginx sit behind a reverse proxy — required for rate-limit + real IPs
+app.set('trust proxy', 1);
+
 // Create logs directory if it doesn't exist
 const logsDir = path.join(__dirname, '../logs');
 if (!fs.existsSync(logsDir)) {
