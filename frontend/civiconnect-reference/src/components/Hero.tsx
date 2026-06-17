@@ -46,10 +46,10 @@ export const Hero = ({ onNavigate }: HeroProps) => {
             <Button 
               variant="hero" 
               size="xl"
-              onClick={() => onNavigate("login")}
+              onClick={() => onNavigate("register")}
               className="text-lg"
             >
-              Report an Issue
+              Get Started — Sign Up
             </Button>
             <Button 
               variant="outline" 

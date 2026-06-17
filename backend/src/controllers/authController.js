@@ -6,6 +6,9 @@ const logger = require('../config/logger');
 
 // Generate JWT Token
 const generateToken = (id) => {
+  if (!process.env.JWT_SECRET) {
+    throw new Error('JWT_SECRET is not configured on the server');
+  }
   return jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRE || '7d'
   });
@@ -26,14 +29,17 @@ const register = async (req, res, next) => {
       });
     }
 
-    const { name, email, password, role, phone, department } = req.body;
+    const { name, email, password, phone } = req.body;
+
+    // Public registration creates citizen accounts only
+    const userRole = 'citizen';
 
     // Check if user exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({
         success: false,
-        message: 'User with this email already exists'
+        message: 'An account with this email already exists. Please sign in instead.'
       });
     }
 
@@ -42,9 +48,9 @@ const register = async (req, res, next) => {
       name,
       email,
       password,
-      role: role || 'citizen',
-      phone,
-      department: role === 'staff' ? department : undefined
+      role: userRole,
+      ...(phone ? { phone } : {}),
+      isEmailVerified: true,
     });
 
     // Generate token

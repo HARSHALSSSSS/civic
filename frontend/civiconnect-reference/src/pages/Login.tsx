@@ -10,9 +10,10 @@ import { apiService } from "@/services/apiService";
 
 interface LoginProps {
   onLogin: (user: { id: string; name: string; role: "citizen" | "staff" }) => void;
+  onNavigate?: (page: string) => void;
 }
 
-export const Login = ({ onLogin }: LoginProps) => {
+export const Login = ({ onLogin, onNavigate }: LoginProps) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -254,7 +255,11 @@ export const Login = ({ onLogin }: LoginProps) => {
         <div className="text-center">
           <p className="text-sm text-muted-foreground">
             Don't have an account?{" "}
-            <button className="text-primary hover:underline">
+            <button
+              type="button"
+              className="text-primary hover:underline font-medium"
+              onClick={() => onNavigate?.("register")}
+            >
               Sign up here
             </button>
           </p>

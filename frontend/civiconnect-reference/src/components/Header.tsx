@@ -116,9 +116,14 @@ export const Header = ({ userRole, onNavigate, currentPage }: HeaderProps) => {
                 </Button>
               </div>
             ) : (
-              <Button variant="civic" size="sm" onClick={() => onNavigate("login")}>
-                Login
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" onClick={() => onNavigate("register")}>
+                  Sign Up
+                </Button>
+                <Button variant="civic" size="sm" onClick={() => onNavigate("login")}>
+                  Login
+                </Button>
+              </div>
             )}
 
             {/* Mobile menu button */}

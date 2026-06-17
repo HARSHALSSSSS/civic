@@ -10,11 +10,11 @@ async function parseResponse(response: Response) {
 
   if (!response.ok) {
     const errors = data?.errors as Array<{ msg?: string }> | undefined;
-    const detail = errors?.[0]?.msg;
+    const validationMessage = errors?.map((e) => e.msg).filter(Boolean).join(". ");
     const message =
       (typeof data?.message === "string" && data.message) ||
       (typeof data?.error === "string" && data.error) ||
-      detail ||
+      validationMessage ||
       `Request failed (${response.status})`;
     throw new Error(message);
   }

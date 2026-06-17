@@ -4,6 +4,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Header } from "@/components/Header";
 import { Hero } from "@/components/Hero";
 import { Login } from "@/pages/Login";
+import { Register } from "@/pages/Register";
 import { ReportIssue } from "@/pages/ReportIssue";
 import { CitizenDashboard } from "@/pages/CitizenDashboard";
 import { AdminDashboard } from "@/pages/AdminDashboard";
@@ -108,7 +109,10 @@ const Index = () => {
     setUser(userData);
     loadReports(userData);
     setCurrentPage(userData.role === "citizen" ? "dashboard" : "admin");
-    toast({ title: "Welcome back!", description: `Signed in as ${userData.name}` });
+    toast({
+      title: userData.role === "citizen" ? "Welcome!" : "Welcome back!",
+      description: `Signed in as ${userData.name}`,
+    });
   };
 
   const handleNavigate = async (page: string) => {
@@ -120,6 +124,8 @@ const Index = () => {
       setCurrentPage("home");
     } else if ((page === "report" || page === "dashboard" || page === "profile") && !user) {
       setCurrentPage("login");
+    } else if ((page === "login" || page === "register") && !user) {
+      setCurrentPage(page);
     } else if (page === "admin" && user?.role !== "staff") {
       setCurrentPage("login");
     } else {
@@ -179,7 +185,9 @@ const Index = () => {
   const renderPage = () => {
     switch (currentPage) {
       case "login":
-        return <Login onLogin={handleLogin} />;
+        return <Login onLogin={handleLogin} onNavigate={handleNavigate} />;
+      case "register":
+        return <Register onLogin={handleLogin} onNavigate={handleNavigate} />;
       case "report":
         return user ? <ReportIssue userId={user.id} onReportSubmitted={handleReportSubmitted} /> : null;
       case "dashboard":

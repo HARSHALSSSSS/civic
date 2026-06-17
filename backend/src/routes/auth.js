@@ -29,11 +29,12 @@ const registerValidation = [
     .isIn(['citizen', 'staff'])
     .withMessage('Role must be either citizen or staff'),
   body('phone')
-    .optional()
-    .isMobilePhone()
+    .optional({ values: 'falsy' })
+    .trim()
+    .matches(/^[+]?[\d\s-]{8,16}$/)
     .withMessage('Please provide a valid phone number'),
   body('department')
-    .if(body('role').equals('staff'))
+    .optional()
     .isIn(['public_works', 'sanitation', 'electrical', 'water', 'traffic', 'general'])
     .withMessage('Please provide a valid department for staff members')
 ];
@@ -55,8 +56,9 @@ const profileValidation = [
     .isLength({ min: 2, max: 100 })
     .withMessage('Name must be between 2 and 100 characters'),
   body('phone')
-    .optional()
-    .isMobilePhone()
+    .optional({ values: 'falsy' })
+    .trim()
+    .matches(/^[+]?[\d\s-]{8,16}$/)
     .withMessage('Please provide a valid phone number')
 ];
 
