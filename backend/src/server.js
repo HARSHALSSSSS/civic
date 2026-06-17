@@ -16,6 +16,7 @@ const connectDB = require('./config/database');
 const logger = require('./config/logger');
 const errorHandler = require('./middleware/error');
 const seedAdmin = require('./config/seedAdmin');
+const { corsOriginCallback, socketCorsOrigin } = require('./config/cors');
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -52,33 +53,14 @@ app.use(limiter);
 
 // CORS configuration
 const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, Postman, etc.)
-    if (!origin) return callback(null, true);
-    
-    // In development, allow all origins
-    if (process.env.NODE_ENV === 'development') {
-      return callback(null, true);
-    }
-    
-    // In production, add your frontend domain
-    const allowedOrigins = [
-      'http://localhost:3000', 
-      'http://localhost:5173',
-      'http://localhost:8080',
-      process.env.FRONTEND_URL // This will be your Vercel URL
-    ].filter(Boolean); // Remove undefined values
-    
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true
+  origin: corsOriginCallback,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
 app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // Compression middleware
 app.use(compression());
@@ -130,10 +112,10 @@ const server = http.createServer(app);
 // Initialize Socket.io
 const io = new Server(server, {
   cors: {
-    origin: process.env.NODE_ENV === 'development' ? '*' : process.env.FRONTEND_URL,
+    origin: process.env.NODE_ENV === 'development' ? '*' : socketCorsOrigin,
     methods: ['GET', 'POST'],
-    credentials: true
-  }
+    credentials: true,
+  },
 });
 
 // Socket.io authentication middleware
