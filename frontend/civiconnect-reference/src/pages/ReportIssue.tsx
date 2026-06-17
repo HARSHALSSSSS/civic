@@ -5,30 +5,60 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Camera, 
-  MapPin, 
-  Loader2, 
-  CheckCircle, 
+import { Switch } from "@/components/ui/switch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
+import {
+  Camera,
+  MapPin,
+  Loader2,
+  CheckCircle,
   Mic,
   Upload,
-  Sparkles
+  Sparkles,
+  ChevronRight,
+  ChevronLeft,
+  Shield,
+  X,
 } from "lucide-react";
-import { mockAIService, mockLocationService } from "@/services/mockData";
+import { mockAIService } from "@/services/mockData";
 import { apiService } from "@/services/apiService";
 import { Report } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { MapPicker } from "@/components/MapPicker";
+import {
+  REPORT_CATEGORIES,
+  URGENCY_LEVELS,
+  AFFECTED_AREAS,
+  CONTACT_PREFERENCES,
+  PRIORITY_LABELS,
+  urgencyToPriority,
+  getCategoryConfig,
+} from "@/constants/categories";
+import { transformBackendReport, extractCreatedReport } from "@/lib/reportUtils";
+import { cn } from "@/lib/utils";
 
 interface ReportIssueProps {
   userId: string;
   onReportSubmitted: (report: Report) => void;
 }
 
+const STEPS = ["Category", "Location", "Evidence", "Review"];
+
 export const ReportIssue = ({ userId, onReportSubmitted }: ReportIssueProps) => {
+  const [step, setStep] = useState(0);
+  const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [photo, setPhoto] = useState<File | null>(null);
-  const [photoPreview, setPhotoPreview] = useState<string>("");
+  const [category, setCategory] = useState("");
+  const [subcategory, setSubcategory] = useState("");
+  const [urgencyLevel, setUrgencyLevel] = useState("medium");
+  const [priority, setPriority] = useState(3);
+  const [affectedArea, setAffectedArea] = useState("street");
+  const [contactPreference, setContactPreference] = useState("app");
+  const [isPublic, setIsPublic] = useState(true);
+  const [landmark, setLandmark] = useState("");
+  const [photos, setPhotos] = useState<File[]>([]);
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([]);
   const [location, setLocation] = useState<{ lat: number; lng: number; address: string } | null>(null);
   const [isGettingLocation, setIsGettingLocation] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -38,191 +68,154 @@ export const ReportIssue = ({ userId, onReportSubmitted }: ReportIssueProps) => 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setPhoto(file);
-      const reader = new FileReader();
-      reader.onload = (e) => setPhotoPreview(e.target?.result as string);
-      reader.readAsDataURL(file);
+  const selectedCategory = getCategoryConfig(category);
+
+  const handleCategoryChange = (val: string) => {
+    setCategory(val);
+    setSubcategory("");
+    const config = getCategoryConfig(val);
+    if (config) {
+      setPriority(config.defaultPriority as Report["priority"]);
     }
+  };
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const remaining = 3 - photos.length;
+    const toAdd = files.slice(0, remaining);
+    if (toAdd.length === 0) {
+      toast({ title: "Maximum 3 photos allowed", variant: "destructive" });
+      return;
+    }
+    setPhotos((prev) => [...prev, ...toAdd]);
+    toAdd.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setPhotoPreviews((prev) => [...prev, ev.target?.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removePhoto = (index: number) => {
+    setPhotos((prev) => prev.filter((_, i) => i !== index));
+    setPhotoPreviews((prev) => prev.filter((_, i) => i !== index));
   };
 
   const getCurrentLocation = async () => {
     setIsGettingLocation(true);
     try {
-      const locationData = await mockLocationService.getCurrentLocation();
-      setLocation(locationData);
-    } catch (error) {
-      console.error("Failed to get location:", error);
+      if (navigator.geolocation) {
+        const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 10000 });
+        });
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setLocation({ lat, lng, address: `GPS: ${lat.toFixed(5)}, ${lng.toFixed(5)}` });
+        toast({ title: "Location captured", description: "You can fine-tune on the map below." });
+      } else {
+        throw new Error("Geolocation not supported");
+      }
+    } catch {
+      setLocation({ lat: 28.6139, lng: 77.209, address: "Connaught Place, New Delhi (default)" });
+      toast({ title: "Using default location", description: "Enable GPS or pin manually on map." });
     }
     setIsGettingLocation(false);
   };
 
   const analyzeWithAI = async () => {
     if (!description.trim()) return;
-    
     setIsAnalyzing(true);
     try {
-      const result = await mockAIService.categorizeReport(description, photoPreview);
+      const result = await mockAIService.categorizeReport(description, photoPreviews[0]);
       setAiResult(result);
-    } catch (error) {
-      console.error("AI analysis failed:", error);
+      if (result.category) handleCategoryChange(result.category);
+      if (result.suggestedTitle && !title) setTitle(result.suggestedTitle);
+      if (result.priority) setPriority(result.priority as Report["priority"]);
+    } catch {
+      toast({ title: "AI analysis unavailable", variant: "destructive" });
     }
     setIsAnalyzing(false);
   };
 
   const startVoiceRecording = () => {
-    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-      const SpeechRecognition = (window as any).webkitSpeechRecognition || (window as any).SpeechRecognition;
-      const recognition = new SpeechRecognition();
-      
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = 'en-US';
-      
-      setIsListening(true);
-      
-      recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        setDescription(prev => prev + (prev ? ' ' : '') + transcript);
-        setIsListening(false);
-      };
-      
-      recognition.onerror = () => {
-        setIsListening(false);
-      };
-      
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-      
-      recognition.start();
-    }
+    const SpeechRecognition = (window as unknown as { webkitSpeechRecognition?: new () => SpeechRecognition }).webkitSpeechRecognition
+      || (window as unknown as { SpeechRecognition?: new () => SpeechRecognition }).SpeechRecognition;
+    if (!SpeechRecognition) return;
+    const recognition = new SpeechRecognition();
+    recognition.lang = "en-IN";
+    setIsListening(true);
+    recognition.onresult = (event: SpeechRecognitionEvent) => {
+      setDescription((prev) => prev + (prev ? " " : "") + event.results[0][0].transcript);
+      setIsListening(false);
+    };
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
+    recognition.start();
+  };
+
+  const canProceed = () => {
+    if (step === 0) return title.trim().length >= 5 && description.trim().length >= 10 && category;
+    if (step === 1) return !!location;
+    if (step === 2) return true;
+    return true;
   };
 
   const submitReport = async () => {
-    if (!description.trim() || !location) return;
-    
+    if (!location || !category) return;
     setIsSubmitting(true);
-    
     try {
+      const payload = {
+        title: title.trim(),
+        description: description.trim(),
+        category,
+        subcategory: subcategory || undefined,
+        priority: priority || urgencyToPriority(urgencyLevel),
+        urgencyLevel,
+        affectedArea,
+        contactPreference,
+        isPublic,
+        longitude: location.lng,
+        latitude: location.lat,
+        address: location.address,
+        landmark: landmark.trim() || undefined,
+      };
+
       let response;
-      
-      if (photo) {
-        // Use FormData for file upload
+      if (photos.length > 0) {
         const formData = new FormData();
-        
-        // Add required fields
-        formData.append('title', aiResult?.suggestedTitle || 'New civic issue report');
-        formData.append('description', description.trim());
-        
-        // Map category to match backend enum
-        const category = aiResult?.category || 'Other';
-        formData.append('category', category.charAt(0).toUpperCase() + category.slice(1));
-        
-        formData.append('priority', String((aiResult?.priority as Report["priority"]) || 2));
-        
-        // Add location data - backend expects separate longitude/latitude fields
-        formData.append('longitude', String(location.lng));
-        formData.append('latitude', String(location.lat));
-        formData.append('address', location.address);
-        
-        // Add photo - backend expects 'photos' field name
-        formData.append('photos', photo);
-        
-        // Submit to backend API with FormData
+        Object.entries(payload).forEach(([key, val]) => {
+          if (val !== undefined) formData.append(key, String(val));
+        });
+        photos.forEach((photo) => formData.append("photos", photo));
         response = await apiService.createReport(formData);
       } else {
-        // Use regular JSON for text-only reports
-        const reportData = {
-          title: aiResult?.suggestedTitle || 'New civic issue report',
-          description: description.trim(),
-          category: (aiResult?.category || 'Other').charAt(0).toUpperCase() + (aiResult?.category || 'Other').slice(1),
-          priority: (aiResult?.priority as Report["priority"]) || 2,
-          longitude: location.lng,
-          latitude: location.lat,
-          address: location.address
-        };
-        
-        // Submit to backend API with JSON
-        const token = localStorage.getItem('authToken');
-        
-        console.log('🚀 Submitting report:', reportData);
-        console.log('🔑 Token:', token ? 'Present' : 'Missing');
-        
-        const apiResponse = await fetch(`http://localhost:5000/api/reports`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify(reportData)
-        });
-        
-        console.log('📡 Response status:', apiResponse.status);
-        console.log('📡 Response ok:', apiResponse.ok);
-        
-        if (!apiResponse.ok) {
-          const errorText = await apiResponse.text();
-          console.error('❌ API Error:', errorText);
-          console.error('❌ Status:', apiResponse.status);
-          console.error('❌ Headers:', Object.fromEntries(apiResponse.headers.entries()));
-          throw new Error(`HTTP ${apiResponse.status}: ${errorText}`);
-        }
-        
-        response = await apiResponse.json();
+        response = await apiService.createReportJson(payload);
       }
-      
-      if (response.success && (response.data || response.report)) {
-        // Convert backend report format to frontend format
-        const reportData = response.data || response.report;
-        const newReport: Report = {
-          id: reportData._id || reportData.id,
-          title: reportData.title,
-          description: reportData.description,
-          category: reportData.category,
-          priority: reportData.priority,
-          status: reportData.status,
-          photoUrl: reportData.imageUrl || reportData.photoUrl,
-          location: {
-            lat: reportData.location?.coordinates?.[1] || location.lat,
-            lng: reportData.location?.coordinates?.[0] || location.lng,
-            address: reportData.location?.address || location.address
-          },
-          citizenId: reportData.citizenId || userId,
-          createdAt: new Date(reportData.createdAt),
-          updatedAt: new Date(reportData.updatedAt)
-        };
-        
-        onReportSubmitted(newReport);
-        
-        toast({
-          title: "Report Submitted Successfully!",
-          description: `Your report has been submitted and saved to the database.`,
-        });
-        
-        // Reset form
-        setDescription("");
-        setPhoto(null);
-        setPhotoPreview("");
-        setLocation(null);
-        setAiResult(null);
-      } else {
-        throw new Error('Failed to submit report');
+
+      if (response?.success === false) {
+        throw new Error((response.message as string) || "Failed to submit report");
       }
-    } catch (error: any) {
-      console.error('Error submitting report:', error);
-      console.error('Error details:', {
-        message: error.message,
-        response: error.response,
-        status: error.status
-      });
-      
+
+      const reportData = extractCreatedReport(response as Record<string, unknown>);
+      onReportSubmitted(transformBackendReport(reportData));
       toast({
-        title: "Submission Failed",
-        description: error.message || "Failed to submit report. Please try again.",
-        variant: "destructive"
+        title: "Report submitted!",
+        description: `Reference: ${(reportData.reportId as string) || "saved"}`,
+      });
+      setStep(0);
+      setTitle("");
+      setDescription("");
+      setCategory("");
+      setPhotos([]);
+      setPhotoPreviews([]);
+      setLocation(null);
+      setAiResult(null);
+    } catch (error: unknown) {
+      toast({
+        title: "Submission failed",
+        description: error instanceof Error ? error.message : "Please try again",
+        variant: "destructive",
       });
     } finally {
       setIsSubmitting(false);
@@ -230,194 +223,293 @@ export const ReportIssue = ({ userId, onReportSubmitted }: ReportIssueProps) => 
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-4 space-y-6">
-      <div className="text-center">
-        <h1 className="text-3xl font-bold text-foreground mb-2">Report an Issue</h1>
-        <p className="text-muted-foreground">Help improve your community by reporting civic issues</p>
+    <div className="max-w-3xl mx-auto p-4 space-y-6">
+      <div className="text-center space-y-2">
+        <h1 className="text-3xl font-bold text-foreground">Report a Civic Issue</h1>
+        <p className="text-muted-foreground">Help your city improve — report in under 2 minutes</p>
       </div>
 
-      <Card>
+      {/* Step indicator */}
+      <div className="space-y-2">
+        <div className="flex justify-between text-xs text-muted-foreground px-1">
+          {STEPS.map((s, i) => (
+            <span key={s} className={cn(i <= step && "text-primary font-medium")}>{s}</span>
+          ))}
+        </div>
+        <Progress value={((step + 1) / STEPS.length) * 100} className="h-1.5" />
+      </div>
+
+      <Card className="border-primary/10 shadow-civic">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Camera className="h-5 w-5 text-primary" />
-            Issue Details
+            {step === 0 && <><Sparkles className="h-5 w-5 text-primary" /> Issue Details</>}
+            {step === 1 && <><MapPin className="h-5 w-5 text-primary" /> Location</>}
+            {step === 2 && <><Camera className="h-5 w-5 text-primary" /> Photo Evidence</>}
+            {step === 3 && <><CheckCircle className="h-5 w-5 text-primary" /> Review & Submit</>}
           </CardTitle>
           <CardDescription>
-            Provide clear details about the civic issue you've encountered
+            {step === 0 && "Describe the issue and select the appropriate category"}
+            {step === 1 && "Pin the exact location on the map"}
+            {step === 2 && "Add up to 3 photos to help officials assess faster"}
+            {step === 3 && "Verify details before submitting to the government portal"}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Photo Upload */}
-          <div className="space-y-2">
-            <Label>Photo (Optional)</Label>
-            <div className="flex flex-col gap-3">
-              {photoPreview ? (
-                <div className="relative">
-                  <img 
-                    src={photoPreview} 
-                    alt="Issue preview" 
-                    className="w-full h-48 object-cover rounded-lg border"
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="absolute top-2 right-2"
-                    onClick={() => {
-                      setPhoto(null);
-                      setPhotoPreview("");
-                      if (fileInputRef.current) fileInputRef.current.value = "";
-                    }}
-                  >
-                    Remove
+
+        <CardContent className="space-y-5">
+          {/* Step 0: Details */}
+          {step === 0 && (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="title">Issue Title *</Label>
+                <Input
+                  id="title"
+                  placeholder="e.g. Large pothole near school gate"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  maxLength={200}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Category *</Label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {REPORT_CATEGORIES.map((cat) => (
+                    <button
+                      key={cat.value}
+                      type="button"
+                      onClick={() => handleCategoryChange(cat.value)}
+                      className={cn(
+                        "p-3 rounded-lg border text-left text-sm transition-all hover:border-primary/50",
+                        category === cat.value
+                          ? "border-primary bg-primary/5 ring-1 ring-primary"
+                          : "border-border"
+                      )}
+                    >
+                      <span className="text-lg">{cat.icon}</span>
+                      <p className="font-medium mt-1 leading-tight">{cat.label}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {selectedCategory && selectedCategory.subcategories.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Subcategory</Label>
+                  <Select value={subcategory} onValueChange={setSubcategory}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select specific issue type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {selectedCategory.subcategories.map((sub) => (
+                        <SelectItem key={sub} value={sub}>{sub}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="description">Description *</Label>
+                  <Button variant="outline" size="sm" onClick={startVoiceRecording} disabled={isListening} className="ml-auto h-7">
+                    {isListening ? <Loader2 className="h-3 w-3 animate-spin" /> : <Mic className="h-3 w-3" />}
+                    <span className="ml-1">{isListening ? "Listening" : "Voice"}</span>
                   </Button>
                 </div>
-              ) : (
-                <div 
-                  className="border-2 border-dashed border-border rounded-lg p-8 text-center cursor-pointer hover:bg-accent/50 transition-colors"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">
-                    Click to upload photo or drag and drop
-                  </p>
-                </div>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={handlePhotoChange}
-                className="hidden"
-              />
-            </div>
-          </div>
-
-          {/* Description */}
-          <div className="space-y-2">
-            <div className="flex items-center gap-2">
-              <Label htmlFor="description">Description</Label>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={startVoiceRecording}
-                disabled={isListening}
-                className="ml-auto"
-              >
-                {isListening ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Mic className="h-4 w-4" />
+                <Textarea
+                  id="description"
+                  placeholder="What happened? When did you notice it? Who is affected?"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={4}
+                />
+                {description.length > 20 && (
+                  <Button variant="outline" size="sm" onClick={analyzeWithAI} disabled={isAnalyzing}>
+                    {isAnalyzing ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <Sparkles className="h-3 w-3 mr-1" />}
+                    AI Suggest Category
+                  </Button>
                 )}
-                {isListening ? "Listening..." : "Voice"}
-              </Button>
-            </div>
-            <Textarea
-              id="description"
-              placeholder="Describe the issue in detail. What did you observe? Where exactly is it located?"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={4}
-              className="resize-none"
-            />
-          </div>
-
-          {/* AI Analysis */}
-          {description.trim().length > 10 && (
-            <div className="space-y-3">
-              <Button
-                variant="outline"
-                onClick={analyzeWithAI}
-                disabled={isAnalyzing}
-                className="w-full"
-              >
-                {isAnalyzing ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Sparkles className="h-4 w-4 mr-2" />
-                )}
-                {isAnalyzing ? "Analyzing with AI..." : "Analyze with AI"}
-              </Button>
-
-              {aiResult && (
-                <div className="bg-primary-light rounded-lg p-4 space-y-2">
-                  <h4 className="font-semibold text-primary">AI Analysis Results:</h4>
-                  <div className="flex gap-2 flex-wrap">
-                    <Badge variant="secondary">Category: {aiResult.category}</Badge>
-                    <Badge variant="outline">Priority: {aiResult.priority}/5</Badge>
+                {aiResult && (
+                  <div className="p-3 rounded-lg bg-primary/5 flex gap-2 flex-wrap">
+                    <Badge>Suggested: {aiResult.category}</Badge>
+                    <Badge variant="outline">P{aiResult.priority}</Badge>
                   </div>
-                  {aiResult.suggestedTitle && (
-                    <p className="text-sm">
-                      <strong>Suggested Title:</strong> {aiResult.suggestedTitle}
-                    </p>
-                  )}
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Urgency Level</Label>
+                  <Select value={urgencyLevel} onValueChange={(v) => { setUrgencyLevel(v); setPriority(urgencyToPriority(v) as Report["priority"]); }}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {URGENCY_LEVELS.map((u) => (
+                        <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Priority (1–5)</Label>
+                  <Select value={String(priority)} onValueChange={(v) => setPriority(Number(v) as Report["priority"])}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {[1, 2, 3, 4, 5].map((p) => (
+                        <SelectItem key={p} value={String(p)}>P{p} — {PRIORITY_LABELS[p]}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Who is affected?</Label>
+                <Select value={affectedArea} onValueChange={setAffectedArea}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {AFFECTED_AREAS.map((a) => (
+                      <SelectItem key={a.value} value={a.value}>{a.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Preferred contact method</Label>
+                <Select value={contactPreference} onValueChange={setContactPreference}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CONTACT_PREFERENCES.map((c) => (
+                      <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center justify-between p-3 rounded-lg border">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-4 w-4 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium">Show in community feed</p>
+                    <p className="text-xs text-muted-foreground">Others can see and support this issue</p>
+                  </div>
+                </div>
+                <Switch checked={isPublic} onCheckedChange={setIsPublic} />
+              </div>
+            </>
+          )}
+
+          {/* Step 1: Location */}
+          {step === 1 && (
+            <>
+              <div className="flex justify-end">
+                <Button variant="outline" size="sm" onClick={getCurrentLocation} disabled={isGettingLocation}>
+                  {isGettingLocation ? <Loader2 className="h-3 w-3 animate-spin mr-1" /> : <MapPin className="h-3 w-3 mr-1" />}
+                  Use My Location
+                </Button>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="landmark">Nearby Landmark</Label>
+                <Input
+                  id="landmark"
+                  placeholder="e.g. Opposite City Mall, near Bus Stop #42"
+                  value={landmark}
+                  onChange={(e) => setLandmark(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Street Address</Label>
+                <Input
+                  placeholder="Enter address or area name"
+                  value={location?.address || ""}
+                  onChange={(e) => setLocation((prev) => prev ? { ...prev, address: e.target.value } : { lat: 28.6139, lng: 77.209, address: e.target.value })}
+                />
+              </div>
+              <MapPicker
+                initialLocation={location ? { lat: location.lat, lng: location.lng } : undefined}
+                onLocationSelect={(lat, lng) => {
+                  setLocation((prev) => ({
+                    lat,
+                    lng,
+                    address: prev?.address || "Selected on map",
+                  }));
+                }}
+              />
+              {location && (
+                <div className="bg-success/10 rounded-lg p-3 flex items-center gap-2 text-sm">
+                  <CheckCircle className="h-4 w-4 text-success" />
+                  <span>{location.lat.toFixed(5)}, {location.lng.toFixed(5)}</span>
                 </div>
               )}
+            </>
+          )}
+
+          {/* Step 2: Photos */}
+          {step === 2 && (
+            <>
+              <div className="grid grid-cols-3 gap-2">
+                {photoPreviews.map((preview, i) => (
+                  <div key={i} className="relative aspect-square">
+                    <img src={preview} alt="" className="w-full h-full object-cover rounded-lg border" />
+                    <button
+                      type="button"
+                      onClick={() => removePhoto(i)}
+                      className="absolute top-1 right-1 bg-destructive text-destructive-foreground rounded-full p-0.5"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+                {photos.length < 3 && (
+                  <div
+                    className="aspect-square border-2 border-dashed rounded-lg flex flex-col items-center justify-center cursor-pointer hover:bg-accent/50"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="h-6 w-6 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground mt-1">Add photo</span>
+                  </div>
+                )}
+              </div>
+              <input ref={fileInputRef} type="file" accept="image/*" capture="environment" multiple onChange={handlePhotoChange} className="hidden" />
+              <p className="text-xs text-muted-foreground text-center">Photos are optional but help resolve issues 40% faster</p>
+            </>
+          )}
+
+          {/* Step 3: Review */}
+          {step === 3 && (
+            <div className="space-y-4">
+              <div className="p-4 rounded-lg bg-muted/50 space-y-3 text-sm">
+                <div className="flex justify-between"><span className="text-muted-foreground">Title</span><span className="font-medium text-right max-w-[60%]">{title}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Category</span><span>{selectedCategory?.icon} {category}</span></div>
+                {subcategory && <div className="flex justify-between"><span className="text-muted-foreground">Subcategory</span><span>{subcategory}</span></div>}
+                <div className="flex justify-between"><span className="text-muted-foreground">Priority</span><Badge>P{priority}</Badge></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Department</span><span>{selectedCategory?.department}</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Location</span><span className="text-right max-w-[60%]">{location?.address}</span></div>
+                {landmark && <div className="flex justify-between"><span className="text-muted-foreground">Landmark</span><span>{landmark}</span></div>}
+                <div className="flex justify-between"><span className="text-muted-foreground">Photos</span><span>{photos.length} attached</span></div>
+                <div className="flex justify-between"><span className="text-muted-foreground">Community visible</span><span>{isPublic ? "Yes" : "No"}</span></div>
+              </div>
+              <p className="text-sm text-muted-foreground">{description}</p>
             </div>
           )}
 
-          {/* Location */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <Label>Location</Label>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={getCurrentLocation}
-                disabled={isGettingLocation}
-                className="h-8 text-xs"
-              >
-                {isGettingLocation ? (
-                  <Loader2 className="h-3 w-3 animate-spin mr-1" />
-                ) : (
-                  <MapPin className="h-3 w-3 mr-1" />
-                )}
-                Get Current
+          {/* Navigation */}
+          <div className="flex gap-3 pt-2">
+            {step > 0 && (
+              <Button variant="outline" onClick={() => setStep(step - 1)} className="flex-1">
+                <ChevronLeft className="h-4 w-4 mr-1" /> Back
               </Button>
-            </div>
-            
-            <MapPicker 
-              initialLocation={location ? { lat: location.lat, lng: location.lng } : undefined}
-              onLocationSelect={(lat, lng) => {
-                setLocation(prev => ({
-                  lat,
-                  lng,
-                  address: prev?.address || "Selected location"
-                }));
-              }}
-            />
-
-            {location && (
-              <div className="bg-success-light rounded-lg p-3 space-y-1">
-                <div className="flex items-center gap-2 text-success">
-                  <CheckCircle className="h-4 w-4" />
-                  <span className="font-semibold text-sm">Location set</span>
-                </div>
-                <p className="text-xs text-muted-foreground">{location.address}</p>
-                <p className="text-[10px] text-muted-foreground">
-                  {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
-                </p>
-              </div>
+            )}
+            {step < STEPS.length - 1 ? (
+              <Button variant="civic" onClick={() => setStep(step + 1)} disabled={!canProceed()} className="flex-1">
+                Next <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            ) : (
+              <Button variant="civic" size="lg" onClick={submitReport} disabled={isSubmitting} className="flex-1">
+                {isSubmitting ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Submitting...</> : "Submit Report"}
+              </Button>
             )}
           </div>
-
-          {/* Submit */}
-          <Button
-            variant="civic"
-            size="lg"
-            onClick={submitReport}
-            disabled={!description.trim() || !location || isSubmitting}
-            className="w-full"
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Submitting Report...
-              </>
-            ) : (
-              "Submit Report"
-            )}
-          </Button>
         </CardContent>
       </Card>
     </div>

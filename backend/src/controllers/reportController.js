@@ -6,6 +6,12 @@ const logger = require('../config/logger');
 const { deleteFile } = require('../middleware/upload');
 const aiService = require('../services/aiService');
 
+const getOwnerId = (citizenId) => {
+  if (!citizenId) return null;
+  if (typeof citizenId === 'object' && citizenId._id) return citizenId._id.toString();
+  return citizenId.toString();
+};
+
 // Get io instance for real-time notifications
 let io = null;
 const setIO = (socketIO) => {
@@ -44,7 +50,10 @@ const createReport = async (req, res, next) => {
       });
     }
 
-    const { title, description, category, priority, longitude, latitude, address } = req.body;
+    const {
+      title, description, category, priority, longitude, latitude, address,
+      subcategory, urgencyLevel, contactPreference, affectedArea, landmark, isPublic
+    } = req.body;
 
     // Create report data
     const reportData = {
@@ -55,9 +64,21 @@ const createReport = async (req, res, next) => {
       location: {
         type: 'Point',
         coordinates: [parseFloat(longitude), parseFloat(latitude)],
-        address
+        address,
+        ...(landmark && { landmark })
       },
-      citizenId: req.user.id
+      citizenId: req.user.id,
+      ...(subcategory && { subcategory }),
+      ...(urgencyLevel && { urgencyLevel }),
+      ...(contactPreference && { contactPreference }),
+      ...(affectedArea && { affectedArea }),
+      ...(isPublic !== undefined && { isPublic: isPublic === true || isPublic === 'true' }),
+      statusHistory: [{
+        fromStatus: null,
+        toStatus: 'Submitted',
+        changedBy: req.user.id,
+        note: 'Report submitted by citizen'
+      }]
     };
 
     // Add photo information if files were uploaded
@@ -95,7 +116,9 @@ const createReport = async (req, res, next) => {
     if (io) {
       io.emit('new_report_map_update', {
         id: report._id,
+        title: report.title,
         category: report.category,
+        status: report.status,
         priority: report.priority,
         location: report.location,
         createdAt: report.createdAt
@@ -105,7 +128,7 @@ const createReport = async (req, res, next) => {
     res.status(201).json({
       success: true,
       message: 'Report submitted successfully',
-      report
+      report: report.toObject ? report.toObject() : report
     });
 
   } catch (error) {
@@ -210,6 +233,7 @@ const getReports = async (req, res, next) => {
       .populate('citizenId', 'name email')
       .populate('assignedStaffId', 'name staffId department')
       .populate('staffComments.staffId', 'name staffId')
+      .populate('statusHistory.changedBy', 'name role department')
       .sort(sort)
       .skip(skip)
       .limit(limit);
@@ -239,7 +263,8 @@ const getReport = async (req, res, next) => {
     const report = await Report.findById(req.params.id)
       .populate('citizenId', 'name email')
       .populate('assignedStaffId', 'name staffId department')
-      .populate('staffComments.staffId', 'name staffId');
+      .populate('staffComments.staffId', 'name staffId')
+      .populate('statusHistory.changedBy', 'name role department');
 
     if (!report) {
       return res.status(404).json({
@@ -257,7 +282,7 @@ const getReport = async (req, res, next) => {
         });
       }
 
-      if (req.user.role === 'citizen' && report.citizenId._id.toString() !== req.user.id) {
+      if (req.user.role === 'citizen' && getOwnerId(report.citizenId) !== req.user.id) {
         return res.status(403).json({
           success: false,
           message: 'Access denied'
@@ -300,7 +325,7 @@ const updateReport = async (req, res, next) => {
     }
 
     // Check if user owns this report
-    if (report.citizenId.toString() !== req.user.id) {
+    if (getOwnerId(report.citizenId) !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to update this report'
@@ -359,7 +384,7 @@ const deleteReport = async (req, res, next) => {
     }
 
     // Check permissions
-    if (req.user.role === 'citizen' && report.citizenId.toString() !== req.user.id) {
+    if (req.user.role === 'citizen' && getOwnerId(report.citizenId) !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to delete this report'
@@ -422,7 +447,7 @@ const submitFeedback = async (req, res, next) => {
     }
 
     // Check if user owns this report
-    if (report.citizenId.toString() !== req.user.id) {
+    if (getOwnerId(report.citizenId) !== req.user.id) {
       return res.status(403).json({
         success: false,
         message: 'Not authorized to provide feedback on this report'
@@ -473,34 +498,34 @@ const toggleSupport = async (req, res, next) => {
       });
     }
 
-    const userId = req.user.id;
-    const hasSupported = report.supports.includes(userId);
+    const userId = req.user.id.toString();
+    const hasSupported = report.supports.some(id => id.toString() === userId);
 
     if (hasSupported) {
-      // Remove support
       report.supports = report.supports.filter(id => id.toString() !== userId);
       report.supportCount = Math.max(0, report.supportCount - 1);
     } else {
-      // Add support
-      report.supports.push(userId);
+      report.supports.push(req.user.id);
       report.supportCount += 1;
     }
 
     await report.save();
 
-    // Notify report owner if someone else supports
-    if (report.citizenId.toString() !== userId) {
-      const supporter = await User.findById(userId);
-      await emitNotification(report.citizenId, {
-        type: 'support_added',
-        title: 'Your Report Received Support',
-        message: `${supporter.name} supported your report "${report.title}".`,
-        reportId: report._id,
-        metadata: {
-          supporterName: supporter.name,
-          newSupportCount: report.supportCount
-        }
-      });
+    const ownerId = getOwnerId(report.citizenId);
+    if (ownerId && ownerId !== userId) {
+      const supporter = await User.findById(req.user.id);
+      if (supporter) {
+        await emitNotification(ownerId, {
+          type: 'support_added',
+          title: 'Your Report Received Support',
+          message: `${supporter.name} supported your report "${report.title}".`,
+          reportId: report._id,
+          metadata: {
+            supporterName: supporter.name,
+            newSupportCount: report.supportCount
+          }
+        });
+      }
     }
 
     logger.info(`Support toggled for report: ${report.reportId} by ${req.user.email} - Count: ${report.supportCount}`);

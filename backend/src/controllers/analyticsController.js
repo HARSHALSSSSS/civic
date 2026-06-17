@@ -184,7 +184,7 @@ const getAdvancedAnalytics = async (req, res, next) => {
                       {
                         $and: [
                           { $eq: ['$status', 'Resolved'] },
-                          { $exists: '$actualResolutionDate' }
+                          { $ne: ['$actualResolutionDate', null] }
                         ]
                       },
                       {

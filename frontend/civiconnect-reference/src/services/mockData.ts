@@ -126,8 +126,16 @@ export const mockAIService = {
       return { category: "Pothole", priority: 4, suggestedTitle: "Road maintenance required" };
     } else if (lowerDesc.includes("garbage") || lowerDesc.includes("waste") || lowerDesc.includes("trash")) {
       return { category: "Waste", priority: 3, suggestedTitle: "Waste management issue" };
-    } else if (lowerDesc.includes("light") || lowerDesc.includes("lamp") || lowerDesc.includes("dark")) {
-      return { category: "Light", priority: 4, suggestedTitle: "Street lighting issue" };
+    } else     if (lowerDesc.includes("light") || lowerDesc.includes("lamp") || lowerDesc.includes("dark")) {
+      return { category: "Streetlight", priority: 4, suggestedTitle: "Street lighting issue" };
+    } else if (lowerDesc.includes("drain") || lowerDesc.includes("flood") || lowerDesc.includes("waterlog")) {
+      return { category: "Drainage", priority: 4, suggestedTitle: "Drainage issue" };
+    } else if (lowerDesc.includes("park") || lowerDesc.includes("tree") || lowerDesc.includes("garden")) {
+      return { category: "Parks", priority: 2, suggestedTitle: "Parks & green space issue" };
+    } else if (lowerDesc.includes("noise") || lowerDesc.includes("loud")) {
+      return { category: "Noise", priority: 2, suggestedTitle: "Noise pollution report" };
+    } else if (lowerDesc.includes("danger") || lowerDesc.includes("unsafe") || lowerDesc.includes("emergency")) {
+      return { category: "Public Safety", priority: 5, suggestedTitle: "Public safety concern" };
     } else if (lowerDesc.includes("water") || lowerDesc.includes("leak") || lowerDesc.includes("pipe")) {
       return { category: "Water", priority: 5, suggestedTitle: "Water infrastructure issue" };
     } else if (lowerDesc.includes("traffic") || lowerDesc.includes("signal") || lowerDesc.includes("congestion")) {

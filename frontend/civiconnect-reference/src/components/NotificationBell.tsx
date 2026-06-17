@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { API_CONFIG } from "@/config/api";
 
 interface Notification {
   _id: string;
@@ -25,7 +26,10 @@ interface NotificationBellProps {
   apiUrl?: string;
 }
 
-export function NotificationBell({ token, apiUrl = "http://localhost:5000" }: NotificationBellProps) {
+export function NotificationBell({
+  token,
+  apiUrl = API_CONFIG.UPLOAD_BASE,
+}: NotificationBellProps) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);

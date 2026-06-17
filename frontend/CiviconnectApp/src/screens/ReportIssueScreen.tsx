@@ -23,10 +23,11 @@ const ReportIssueScreen: React.FC<ReportIssueScreenProps> = ({ navigation }) => 
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [location, setLocation] = useState({
-    latitude: -1.286389,
-    longitude: 36.817223,
-    address: 'Nairobi, Kenya'
+    latitude: 28.6139,
+    longitude: 77.209,
+    address: 'New Delhi, India',
   });
+  const [category, setCategory] = useState('Other');
 
   useEffect(() => {
     loadUser();
@@ -53,11 +54,11 @@ const ReportIssueScreen: React.FC<ReportIssueScreenProps> = ({ navigation }) => 
       const issueData = {
         title: title.trim(),
         description: description.trim(),
+        category,
+        priority: 3,
         latitude: location.latitude,
         longitude: location.longitude,
         address: location.address,
-        citizenId: user.id,
-        photoUrl: undefined, // For demo, we'll skip photo upload
       };
 
       const response = await apiService.createIssue(issueData);

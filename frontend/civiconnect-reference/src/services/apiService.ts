@@ -1,107 +1,228 @@
 import { API_CONFIG, getAuthHeaders, getUploadHeaders } from '../config/api';
 
-export class ApiService {
-  private baseUrl = API_CONFIG.BASE_URL;
-  private isBackendAvailable = false;
-  
-  constructor() {
-    // Test connection on startup
-    this.testConnection();
-  }
-  
-  // Test backend connection
-  async testConnection(): Promise<boolean> {
-    try {
-      const response = await fetch(`${this.baseUrl.replace('/api', '')}/health`, {
-        method: 'GET',
-        timeout: 3000
-      } as any);
-      this.isBackendAvailable = response.ok;
-      return response.ok;
-    } catch {
-      this.isBackendAvailable = false;
-      return false;
-    }
+async function parseResponse(response: Response) {
+  let data: Record<string, unknown> | null = null;
+  try {
+    data = await response.json();
+  } catch {
+    // Response body may be empty or non-JSON
   }
 
-  // Authentication methods
+  if (!response.ok) {
+    const errors = data?.errors as Array<{ msg?: string }> | undefined;
+    const detail = errors?.[0]?.msg;
+    const message =
+      (typeof data?.message === "string" && data.message) ||
+      (typeof data?.error === "string" && data.error) ||
+      detail ||
+      `Request failed (${response.status})`;
+    throw new Error(message);
+  }
+
+  return data ?? {};
+}
+
+export class ApiService {
+  private baseUrl = API_CONFIG.BASE_URL;
+
+  private getToken() {
+    return localStorage.getItem('authToken') || undefined;
+  }
+
   async login(email: string, password: string) {
     const response = await fetch(`${this.baseUrl}${API_CONFIG.ENDPOINTS.LOGIN}`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password }),
     });
-    
-    if (!response.ok) {
-      throw new Error('Login failed');
-    }
-    
-    const data = await response.json();
-    
-    // Store token in localStorage
+    const data = await parseResponse(response);
     if (data.token) {
       localStorage.setItem('authToken', data.token);
       localStorage.setItem('userData', JSON.stringify(data.user));
     }
-    
     return data;
   }
 
-  async register(userData: any) {
+  async register(userData: Record<string, unknown>) {
     const response = await fetch(`${this.baseUrl}${API_CONFIG.ENDPOINTS.REGISTER}`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify(userData)
+      body: JSON.stringify(userData),
     });
-    
-    if (!response.ok) {
-      throw new Error('Registration failed');
-    }
-    
-    const data = await response.json();
-    
-    // Store token in localStorage
+    const data = await parseResponse(response);
     if (data.token) {
       localStorage.setItem('authToken', data.token);
       localStorage.setItem('userData', JSON.stringify(data.user));
     }
-    
     return data;
   }
 
-  // Reports methods
-  async getReports(filters?: any) {
-    const token = localStorage.getItem('authToken');
-    const queryString = filters ? new URLSearchParams(filters).toString() : '';
-    
-    const response = await fetch(`${this.baseUrl}${API_CONFIG.ENDPOINTS.REPORTS}?${queryString}`, {
-      headers: getAuthHeaders(token || undefined)
+  async getMe() {
+    const response = await fetch(`${this.baseUrl}${API_CONFIG.ENDPOINTS.ME}`, {
+      headers: getAuthHeaders(this.getToken()),
     });
-    
-    if (!response.ok) {
-      throw new Error('Failed to fetch reports');
-    }
-    
-    return response.json();
+    return parseResponse(response);
   }
 
-  async createReport(reportData: FormData) {
-    const token = localStorage.getItem('authToken');
-    
+  async updateProfile(profile: Record<string, unknown>) {
+    const response = await fetch(`${this.baseUrl}${API_CONFIG.ENDPOINTS.UPDATE_PROFILE}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(this.getToken()),
+      body: JSON.stringify(profile),
+    });
+    const data = await parseResponse(response);
+    if (data.user) {
+      localStorage.setItem('userData', JSON.stringify(data.user));
+    }
+    return data;
+  }
+
+  async changePassword(currentPassword: string, newPassword: string) {
+    const response = await fetch(`${this.baseUrl}${API_CONFIG.ENDPOINTS.CHANGE_PASSWORD}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(this.getToken()),
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+    return parseResponse(response);
+  }
+
+  async getMyReports() {
+    const response = await fetch(`${this.baseUrl}${API_CONFIG.ENDPOINTS.REPORTS_MY}`, {
+      headers: getAuthHeaders(this.getToken()),
+    });
+    return parseResponse(response);
+  }
+
+  async getAdminReports() {
+    const response = await fetch(`${this.baseUrl}${API_CONFIG.ENDPOINTS.REPORTS_ADMIN}`, {
+      headers: getAuthHeaders(this.getToken()),
+    });
+    return parseResponse(response);
+  }
+
+  async getCommunityReports() {
+    const response = await fetch(`${this.baseUrl}${API_CONFIG.ENDPOINTS.REPORTS_COMMUNITY}`, {
+      headers: getAuthHeaders(this.getToken()),
+    });
+    return parseResponse(response);
+  }
+
+  async getReportById(id: string) {
+    const response = await fetch(`${this.baseUrl}${API_CONFIG.ENDPOINTS.REPORT_BY_ID(id)}`, {
+      headers: getAuthHeaders(this.getToken()),
+    });
+    return parseResponse(response);
+  }
+
+  async createReport(formData: FormData) {
     const response = await fetch(`${this.baseUrl}${API_CONFIG.ENDPOINTS.REPORTS}`, {
       method: 'POST',
-      headers: getUploadHeaders(token || undefined),
-      body: reportData
+      headers: getUploadHeaders(this.getToken()),
+      body: formData,
     });
-    
-    if (!response.ok) {
-      throw new Error('Failed to create report');
-    }
-    
-    return response.json();
+    return parseResponse(response);
   }
 
-  // Helper methods
+  async createReportJson(reportData: Record<string, unknown>) {
+    const response = await fetch(`${this.baseUrl}${API_CONFIG.ENDPOINTS.REPORTS}`, {
+      method: 'POST',
+      headers: getAuthHeaders(this.getToken()),
+      body: JSON.stringify(reportData),
+    });
+    return parseResponse(response);
+  }
+
+  async toggleSupport(reportId: string) {
+    const response = await fetch(`${this.baseUrl}${API_CONFIG.ENDPOINTS.TOGGLE_SUPPORT(reportId)}`, {
+      method: 'POST',
+      headers: getAuthHeaders(this.getToken()),
+    });
+    return parseResponse(response);
+  }
+
+  async submitFeedback(reportId: string, rating: number, comment?: string) {
+    const response = await fetch(`${this.baseUrl}${API_CONFIG.ENDPOINTS.SUBMIT_FEEDBACK(reportId)}`, {
+      method: 'POST',
+      headers: getAuthHeaders(this.getToken()),
+      body: JSON.stringify({ rating, comment }),
+    });
+    return parseResponse(response);
+  }
+
+  async assignReport(reportId: string, staffId?: string) {
+    const response = await fetch(`${this.baseUrl}${API_CONFIG.ENDPOINTS.ASSIGN_REPORT(reportId)}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(this.getToken()),
+      body: JSON.stringify(staffId ? { staffId } : {}),
+    });
+    return parseResponse(response);
+  }
+
+  async updateReportStatus(
+    reportId: string,
+    payload: {
+      status: string;
+      resolutionDetails?: string;
+      estimatedResolutionDate?: string;
+      rejectionReason?: string;
+      statusNote?: string;
+    }
+  ) {
+    const response = await fetch(`${this.baseUrl}${API_CONFIG.ENDPOINTS.UPDATE_STATUS(reportId)}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(this.getToken()),
+      body: JSON.stringify(payload),
+    });
+    return parseResponse(response);
+  }
+
+  async updateReportPriority(
+    reportId: string,
+    payload: { priority: number; note?: string }
+  ) {
+    const response = await fetch(`${this.baseUrl}${API_CONFIG.ENDPOINTS.UPDATE_PRIORITY(reportId)}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(this.getToken()),
+      body: JSON.stringify(payload),
+    });
+    return parseResponse(response);
+  }
+
+  async getStaffMembers() {
+    const response = await fetch(`${this.baseUrl}${API_CONFIG.ENDPOINTS.STAFF_MEMBERS}`, {
+      headers: getAuthHeaders(this.getToken()),
+    });
+    return parseResponse(response);
+  }
+
+  async addStaffComment(reportId: string, comment: string) {
+    const response = await fetch(`${this.baseUrl}${API_CONFIG.ENDPOINTS.ADD_COMMENT(reportId)}`, {
+      method: 'POST',
+      headers: getAuthHeaders(this.getToken()),
+      body: JSON.stringify({ comment }),
+    });
+    return parseResponse(response);
+  }
+
+  async getAnalyticsStats() {
+    const response = await fetch(`${this.baseUrl}${API_CONFIG.ENDPOINTS.ANALYTICS_STATS}`);
+    return parseResponse(response);
+  }
+
+  async getAdvancedAnalytics() {
+    const response = await fetch(`${this.baseUrl}${API_CONFIG.ENDPOINTS.ANALYTICS_ADVANCED}`, {
+      headers: getAuthHeaders(this.getToken()),
+    });
+    return parseResponse(response);
+  }
+
+  async getStaffDashboard() {
+    const response = await fetch(`${this.baseUrl}${API_CONFIG.ENDPOINTS.STAFF_DASHBOARD}`, {
+      headers: getAuthHeaders(this.getToken()),
+    });
+    return parseResponse(response);
+  }
+
   getCurrentUser() {
     const userData = localStorage.getItem('userData');
     return userData ? JSON.parse(userData) : null;
@@ -116,7 +237,7 @@ export class ApiService {
     localStorage.removeItem('userData');
   }
 
-  isAuthenticated(): boolean {
+  isAuthenticated() {
     return !!localStorage.getItem('authToken');
   }
 }

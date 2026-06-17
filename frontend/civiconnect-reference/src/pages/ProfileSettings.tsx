@@ -1,12 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { User, Mail, Bell, Shield, Save, Camera } from "lucide-react";
+import { User, Mail, Bell, Shield, Save, Loader2, Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiService } from "@/services/apiService";
 
 interface UserData {
   id: string;
@@ -22,50 +23,70 @@ interface ProfileSettingsProps {
 export const ProfileSettings = ({ user }: ProfileSettingsProps) => {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
+  const storedUser = apiService.getCurrentUser();
   const [formData, setFormData] = useState({
     name: user.name,
-    email: user.email || "user@example.com",
-    avatar: ""
+    email: storedUser?.email || user.email || "",
+    phone: storedUser?.phone || "",
   });
+  const [passwords, setPasswords] = useState({ current: "", new: "", confirm: "" });
   const [notifications, setNotifications] = useState({
     emailReports: true,
     emailStatusUpdates: true,
     pushNotifications: true,
-    weeklyDigest: false
+    weeklyDigest: false,
   });
+
+  useEffect(() => {
+    apiService.getMe().then((data) => {
+      if (data.user) {
+        setFormData({
+          name: data.user.name,
+          email: data.user.email,
+          phone: data.user.phone || "",
+        });
+      }
+    }).catch(() => {});
+  }, []);
 
   const handleSaveProfile = async () => {
     setIsSaving(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      toast({
-        title: "Profile Updated",
-        description: "Your profile information has been saved successfully.",
+      await apiService.updateProfile({
+        name: formData.name,
+        phone: formData.phone,
       });
-    } catch {
+      toast({ title: "Profile Updated", description: "Your information has been saved." });
+    } catch (error) {
       toast({
         title: "Update Failed",
-        description: "Failed to update profile. Please try again.",
-        variant: "destructive"
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
       });
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleSaveNotifications = async () => {
+  const handleChangePassword = async () => {
+    if (passwords.new !== passwords.confirm) {
+      toast({ title: "Passwords don't match", variant: "destructive" });
+      return;
+    }
+    if (passwords.new.length < 6) {
+      toast({ title: "Password must be at least 6 characters", variant: "destructive" });
+      return;
+    }
     setIsSaving(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await apiService.changePassword(passwords.current, passwords.new);
+      toast({ title: "Password changed successfully" });
+      setPasswords({ current: "", new: "", confirm: "" });
+    } catch (error) {
       toast({
-        title: "Notification Settings Updated",
-        description: "Your notification preferences have been saved.",
-      });
-    } catch {
-      toast({
-        title: "Update Failed",
-        description: "Failed to update settings. Please try again.",
-        variant: "destructive"
+        title: "Password change failed",
+        description: error instanceof Error ? error.message : "Check your current password.",
+        variant: "destructive",
       });
     } finally {
       setIsSaving(false);
@@ -127,11 +148,15 @@ export const ProfileSettings = ({ user }: ProfileSettingsProps) => {
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email Address</Label>
+              <Input id="email" type="email" value={formData.email} disabled className="bg-muted" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone Number</Label>
               <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                id="phone"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                placeholder="+91XXXXXXXXXX"
               />
             </div>
           </div>
@@ -247,7 +272,7 @@ export const ProfileSettings = ({ user }: ProfileSettingsProps) => {
 
           <Button
             variant="secondary"
-            onClick={handleSaveNotifications}
+            onClick={() => toast({ title: "Preferences saved locally" })}
             disabled={isSaving}
             className="w-full md:w-auto"
           >
@@ -281,20 +306,35 @@ export const ProfileSettings = ({ user }: ProfileSettingsProps) => {
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="currentPassword">Current Password</Label>
-            <Input id="currentPassword" type="password" placeholder="Enter current password" />
+            <Input
+              id="currentPassword"
+              type="password"
+              value={passwords.current}
+              onChange={(e) => setPasswords({ ...passwords, current: e.target.value })}
+            />
           </div>
           <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="newPassword">New Password</Label>
-              <Input id="newPassword" type="password" placeholder="Enter new password" />
+              <Input
+                id="newPassword"
+                type="password"
+                value={passwords.new}
+                onChange={(e) => setPasswords({ ...passwords, new: e.target.value })}
+              />
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm New Password</Label>
-              <Input id="confirmPassword" type="password" placeholder="Confirm new password" />
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={passwords.confirm}
+                onChange={(e) => setPasswords({ ...passwords, confirm: e.target.value })}
+              />
             </div>
           </div>
-          <Button variant="outline">
-            <Mail className="h-4 w-4 mr-2" />
+          <Button variant="outline" onClick={handleChangePassword} disabled={isSaving}>
+            {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Mail className="h-4 w-4 mr-2" />}
             Change Password
           </Button>
         </CardContent>

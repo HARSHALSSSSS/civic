@@ -23,7 +23,11 @@ const reportSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Category is required'],
     enum: {
-      values: ['Pothole', 'Waste', 'Light', 'Water', 'Traffic', 'Other'],
+      values: [
+        'Pothole', 'Road Damage', 'Waste', 'Sanitation', 'Light', 'Streetlight',
+        'Water', 'Drainage', 'Traffic', 'Parks', 'Noise', 'Building',
+        'Public Safety', 'Other'
+      ],
       message: '{VALUE} is not a supported category'
     }
   },
@@ -60,7 +64,32 @@ const reportSchema = new mongoose.Schema({
       type: String,
       trim: true,
       maxlength: [500, 'Address cannot exceed 500 characters']
+    },
+    landmark: {
+      type: String,
+      trim: true,
+      maxlength: [200, 'Landmark cannot exceed 200 characters']
     }
+  },
+  subcategory: {
+    type: String,
+    trim: true,
+    maxlength: [100, 'Subcategory cannot exceed 100 characters']
+  },
+  urgencyLevel: {
+    type: String,
+    enum: ['low', 'medium', 'high', 'emergency'],
+    default: 'medium'
+  },
+  contactPreference: {
+    type: String,
+    enum: ['app', 'email', 'phone', 'none'],
+    default: 'app'
+  },
+  affectedArea: {
+    type: String,
+    enum: ['individual', 'street', 'block', 'neighborhood'],
+    default: 'street'
   },
   // Photo attachments
   photos: [{
@@ -108,6 +137,35 @@ const reportSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
+  statusHistory: [{
+    fromStatus: {
+      type: String,
+      default: null
+    },
+    toStatus: {
+      type: String,
+      required: true
+    },
+    changedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      required: true
+    },
+    note: {
+      type: String,
+      trim: true,
+      maxlength: [1000]
+    },
+    createdAt: {
+      type: Date,
+      default: Date.now
+    }
+  }],
+  rejectionReason: {
+    type: String,
+    trim: true,
+    maxlength: [1000]
+  },
   // Citizen feedback
   citizenFeedback: {
     rating: {

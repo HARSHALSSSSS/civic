@@ -184,7 +184,9 @@ io.on('connection', (socket) => {
 
 // Make io available to controllers
 const reportController = require('./controllers/reportController');
+const notificationService = require('./services/notificationService');
 reportController.setIO(io);
+notificationService.setIO(io);
 
 // Export io for use in other modules
 module.exports.io = io;
@@ -197,6 +199,16 @@ const seedAdminOnStartup = async () => {
     logger.error(`Admin seeding failed: ${error.message}`);
   }
 };
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    logger.error(`Port ${PORT} is already in use. Stop the existing process or set a different PORT in backend/.env.`);
+    process.exit(1);
+  }
+
+  logger.error(`Server error: ${err.message}`);
+  process.exit(1);
+});
 
 server.listen(PORT, async () => {
   logger.info(`

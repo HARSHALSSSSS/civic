@@ -11,30 +11,42 @@ import {
 import apiService from '../services/api';
 
 interface LoginScreenProps {
-  navigation: any;
+  navigation: { replace: (route: string) => void };
 }
 
 const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
-  const [email, setEmail] = useState('citizen@example.com');
+  const [email, setEmail] = useState('test@example.com');
+  const [password, setPassword] = useState('password123');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!email.trim()) {
-      Alert.alert('Error', 'Please enter your email');
+    if (!email.trim() || !password) {
+      Alert.alert('Error', 'Please enter email and password');
       return;
     }
 
     setLoading(true);
     try {
-      const response = await apiService.login(email.trim(), 'citizen');
-      
+      let response = await apiService.login(email.trim(), password);
+
+      if (!response.success) {
+        const reg = await apiService.register({
+          name: 'Demo Citizen',
+          email: email.trim(),
+          password,
+          role: 'citizen',
+        });
+        if (reg.success) {
+          response = reg;
+        }
+      }
+
       if (response.success) {
-        // Navigate to main app
         navigation.replace('MainTabs');
       } else {
-        Alert.alert('Login Failed', response.error || 'An error occurred');
+        Alert.alert('Login Failed', response.error || 'Check credentials and ensure backend is running');
       }
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Network error. Please try again.');
     } finally {
       setLoading(false);
@@ -54,8 +66,19 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
           style={styles.input}
           value={email}
           onChangeText={setEmail}
-          placeholder="Enter your email"
+          placeholder="test@example.com"
           keyboardType="email-address"
+          autoCapitalize="none"
+          editable={!loading}
+        />
+
+        <Text style={styles.label}>Password</Text>
+        <TextInput
+          style={styles.input}
+          value={password}
+          onChangeText={setPassword}
+          placeholder="password123"
+          secureTextEntry
           autoCapitalize="none"
           editable={!loading}
         />
@@ -73,17 +96,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
         </TouchableOpacity>
 
         <Text style={styles.helpText}>
-          Demo app - use any email to login
+          Demo: test@example.com / password123
         </Text>
       </View>
 
       <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          Report civic issues in 30 seconds
-        </Text>
-        <Text style={styles.footerSubtext}>
-          AI-powered • Real-time tracking • Offline sync
-        </Text>
+        <Text style={styles.footerText}>Report civic issues in your community</Text>
       </View>
     </View>
   );
@@ -92,59 +110,58 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f8fafc',
+    padding: 24,
     justifyContent: 'center',
-    padding: 20,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 50,
+    marginBottom: 40,
   },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#2c3e50',
+    color: '#1e40af',
     marginBottom: 8,
   },
   subtitle: {
     fontSize: 16,
-    color: '#7f8c8d',
+    color: '#64748b',
   },
   form: {
     backgroundColor: '#ffffff',
-    padding: 30,
-    borderRadius: 12,
-    marginBottom: 30,
-    elevation: 2,
+    borderRadius: 16,
+    padding: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 8,
+    elevation: 4,
   },
   label: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    color: '#2c3e50',
+    color: '#374151',
     marginBottom: 8,
+    marginTop: 12,
   },
   input: {
     borderWidth: 1,
-    borderColor: '#e1e1e1',
+    borderColor: '#d1d5db',
     borderRadius: 8,
-    padding: 15,
+    padding: 12,
     fontSize: 16,
-    marginBottom: 20,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f9fafb',
   },
   button: {
-    backgroundColor: '#3498db',
-    paddingVertical: 15,
+    backgroundColor: '#2563eb',
     borderRadius: 8,
+    padding: 16,
     alignItems: 'center',
-    marginBottom: 15,
+    marginTop: 24,
   },
   buttonDisabled: {
-    backgroundColor: '#bdc3c7',
+    opacity: 0.6,
   },
   buttonText: {
     color: '#ffffff',
@@ -153,21 +170,17 @@ const styles = StyleSheet.create({
   },
   helpText: {
     textAlign: 'center',
-    color: '#7f8c8d',
-    fontSize: 14,
+    color: '#9ca3af',
+    fontSize: 12,
+    marginTop: 16,
   },
   footer: {
+    marginTop: 32,
     alignItems: 'center',
   },
   footerText: {
-    fontSize: 16,
-    color: '#2c3e50',
-    fontWeight: '600',
-    marginBottom: 5,
-  },
-  footerSubtext: {
+    color: '#94a3b8',
     fontSize: 14,
-    color: '#7f8c8d',
   },
 });
 

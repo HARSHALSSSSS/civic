@@ -3,10 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   AlertTriangle, 
@@ -15,17 +12,16 @@ import {
   Users,
   Search,
   Filter,
-  MapPin,
-  Calendar,
   TrendingUp,
   Eye,
-  MessageSquare,
-  ThumbsUp,
   BarChart3,
   PieChart,
-  TrendingDown
+  TrendingDown,
+  Briefcase,
+  Loader2,
+  ThumbsUp
 } from "lucide-react";
-import { Report } from "@/types";
+import { Report, StaffReportUpdate } from "@/types";
 import { cn } from "@/lib/utils";
 import {
   BarChart,
@@ -46,6 +42,10 @@ import {
 } from "recharts";
 import { NotificationBell } from "@/components/NotificationBell";
 import { RealtimeMapDashboard } from "@/components/RealtimeMapDashboard";
+import { AdminReportPanel } from "@/components/AdminReportPanel";
+import { apiService } from "@/services/apiService";
+import { API_CONFIG } from "@/config/api";
+import { REPORT_CATEGORIES } from "@/constants/categories";
 
 interface AnalyticsData {
   summary: {
@@ -74,23 +74,35 @@ interface AnalyticsData {
 
 interface AdminDashboardProps {
   reports: Report[];
-  onUpdateReport: (reportId: string, updates: Partial<Report>) => void;
+  onUpdateReport: (reportId: string, updates: StaffReportUpdate) => Promise<void>;
   token?: string;
+  onRefresh?: () => void;
+}
+
+interface StaffDashboardData {
+  pendingCount: number;
+  overdueCount: number;
+  statusCounts: Array<{ _id: string; count: number }>;
+  assignedReports: Array<Record<string, unknown>>;
+  recentActivity: Array<Record<string, unknown>>;
+  isAdmin: boolean;
 }
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
-export const AdminDashboard = ({ reports, onUpdateReport, token }: AdminDashboardProps) => {
+export const AdminDashboard = ({ reports, onUpdateReport, token, onRefresh }: AdminDashboardProps) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
+  const [categoryFilter, setCategoryFilter] = useState<string>("all");
   const [filteredReports, setFilteredReports] = useState<Report[]>([]);
   const [selectedReport, setSelectedReport] = useState<Report | null>(null);
-  const [newStatus, setNewStatus] = useState<string>("");
-  const [staffComment, setStaffComment] = useState("");
-  const [realtimeCount, setRealtimeCount] = useState(reports.length);
+  const [panelOpen, setPanelOpen] = useState(false);
   const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [staffDashboard, setStaffDashboard] = useState<StaffDashboardData | null>(null);
+  const [opsLoading, setOpsLoading] = useState(false);
 
   // Fetch analytics data
   useEffect(() => {
@@ -102,35 +114,14 @@ export const AdminDashboard = ({ reports, onUpdateReport, token }: AdminDashboar
   const fetchAnalytics = async () => {
     setAnalyticsLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/reports/analytics/advanced', {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          setAnalytics(data.data);
-        }
-      }
+      const data = await apiService.getAdvancedAnalytics();
+      if (data.success) setAnalytics(data.data);
     } catch (error) {
       console.error('Failed to fetch analytics:', error);
     } finally {
       setAnalyticsLoading(false);
     }
   };
-
-  // Mock real-time updates
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const shouldUpdate = Math.random() > 0.7;
-      if (shouldUpdate) {
-        setRealtimeCount(prev => prev + Math.floor(Math.random() * 2));
-      }
-    }, 10000);
-
-    return () => clearInterval(interval);
-  }, []);
 
   useEffect(() => {
     let filtered = [...reports].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
@@ -139,7 +130,7 @@ export const AdminDashboard = ({ reports, onUpdateReport, token }: AdminDashboar
       filtered = filtered.filter(report =>
         report.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         report.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        report.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (report.reportId || report.id).toLowerCase().includes(searchTerm.toLowerCase()) ||
         report.category.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
@@ -152,26 +143,28 @@ export const AdminDashboard = ({ reports, onUpdateReport, token }: AdminDashboar
       filtered = filtered.filter(report => report.priority === parseInt(priorityFilter));
     }
 
-    setFilteredReports(filtered);
-  }, [searchTerm, statusFilter, priorityFilter, reports]);
-
-  const handleUpdateReport = () => {
-    if (!selectedReport || !newStatus) return;
-
-    const updates: Partial<Report> = {
-      status: newStatus as Report["status"],
-      updatedAt: new Date(),
-    };
-
-    if (staffComment.trim()) {
-      updates.staffComment = staffComment.trim();
-      updates.assignedStaffId = "staff1";
+    if (categoryFilter !== "all") {
+      filtered = filtered.filter(report => report.category === categoryFilter);
     }
 
-    onUpdateReport(selectedReport.id, updates);
-    setSelectedReport(null);
-    setNewStatus("");
-    setStaffComment("");
+    setFilteredReports(filtered);
+  }, [searchTerm, statusFilter, priorityFilter, categoryFilter, reports]);
+
+  const fetchStaffDashboard = async () => {
+    setOpsLoading(true);
+    try {
+      const data = await apiService.getStaffDashboard();
+      if (data.success) setStaffDashboard(data.data as StaffDashboardData);
+    } catch (error) {
+      console.error("Failed to fetch operations data:", error);
+    } finally {
+      setOpsLoading(false);
+    }
+  };
+
+  const openReportPanel = (report: Report) => {
+    setSelectedReport(report);
+    setPanelOpen(true);
   };
 
   const getStatusIcon = (status: Report["status"]) => {
@@ -262,16 +255,16 @@ export const AdminDashboard = ({ reports, onUpdateReport, token }: AdminDashboar
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-          <p className="text-gray-500">Manage and respond to civic issue reports</p>
+          <h1 className="text-3xl font-bold text-foreground">Government Portal</h1>
+          <p className="text-muted-foreground">Manage civic reports, assign teams, and track resolution</p>
         </div>
-        <div className="flex items-center gap-4">
-          {token && <NotificationBell token={token} />}
-          <div className="flex items-center gap-2 bg-blue-50 rounded-lg p-3">
-            <TrendingUp className="h-5 w-5 text-blue-600" />
+        <div className="flex items-center gap-3">
+          {token && <NotificationBell token={token} apiUrl={API_CONFIG.BASE_URL.replace('/api', '')} />}
+          <div className="flex items-center gap-2 bg-primary/10 rounded-lg px-4 py-2">
+            <TrendingUp className="h-5 w-5 text-primary" />
             <div>
-              <p className="text-sm font-semibold text-blue-600">Live Updates</p>
-              <p className="text-xs text-gray-500">{realtimeCount} total reports</p>
+              <p className="text-sm font-semibold text-primary">{reports.length} Active Reports</p>
+              <p className="text-xs text-muted-foreground">{stats.pending} awaiting action</p>
             </div>
           </div>
         </div>
@@ -365,9 +358,19 @@ export const AdminDashboard = ({ reports, onUpdateReport, token }: AdminDashboar
       </div>
 
       {/* Analytics Section */}
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+      <Tabs
+        value={activeTab}
+        onValueChange={(tab) => {
+          setActiveTab(tab);
+          if (tab === "map" || tab === "reports") onRefresh?.();
+          if (tab === "overview" || tab === "categories" || tab === "trends") fetchAnalytics();
+          if (tab === "operations") fetchStaffDashboard();
+        }}
+        className="w-full"
+      >
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="operations">Operations</TabsTrigger>
           <TabsTrigger value="categories">Categories</TabsTrigger>
           <TabsTrigger value="trends">Trends</TabsTrigger>
           <TabsTrigger value="map">Map View</TabsTrigger>
@@ -480,6 +483,92 @@ export const AdminDashboard = ({ reports, onUpdateReport, token }: AdminDashboar
           </div>
         </TabsContent>
 
+        <TabsContent value="operations" className="space-y-4">
+          {opsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Briefcase className="h-4 w-4" /> Queue
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between items-center p-3 rounded-lg bg-amber-50">
+                    <span className="text-sm">Awaiting Action</span>
+                    <span className="text-2xl font-bold text-amber-700">
+                      {staffDashboard?.pendingCount ?? stats.pending + stats.assigned}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 rounded-lg bg-red-50">
+                    <span className="text-sm">Overdue (past ETA)</span>
+                    <span className="text-2xl font-bold text-red-700">
+                      {staffDashboard?.overdueCount ?? 0}
+                    </span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="lg:col-span-2">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Status Breakdown</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {(staffDashboard?.statusCounts || localAnalytics.byStatus.map((s) => ({ _id: s.status, count: s.count }))).map((item) => (
+                      <div key={item._id} className="p-3 rounded-lg border text-center">
+                        <p className="text-xs text-muted-foreground">{item._id}</p>
+                        <p className="text-xl font-bold">{item.count}</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="lg:col-span-3">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Recent Activity</CardTitle>
+                  <CardDescription>Latest report updates across the platform</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {(staffDashboard?.recentActivity?.length
+                      ? staffDashboard.recentActivity
+                      : reports.slice(0, 8)
+                    ).map((item, i) => {
+                      const r = item as Record<string, unknown>;
+                      const title = String(r.title || "Report");
+                      const status = String(r.status || "");
+                      const id = String(r._id || r.id || i);
+                      return (
+                        <div
+                          key={id}
+                          className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 cursor-pointer"
+                          onClick={() => {
+                            const match = reports.find((rep) => rep.id === id);
+                            if (match) openReportPanel(match);
+                          }}
+                        >
+                          <div>
+                            <p className="font-medium text-sm truncate max-w-xs">{title}</p>
+                            <p className="text-xs text-muted-foreground">{status}</p>
+                          </div>
+                          <Button variant="ghost" size="sm">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </TabsContent>
+
         <TabsContent value="categories" className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* Category Distribution Pie Chart */}
@@ -572,8 +661,10 @@ export const AdminDashboard = ({ reports, onUpdateReport, token }: AdminDashboar
           </Card>
         </TabsContent>
 
-        <TabsContent value="map" className="space-y-4">
-          <RealtimeMapDashboard token={token || ""} />
+        <TabsContent value="map" className="space-y-4 mt-4">
+          {activeTab === "map" && (
+            <RealtimeMapDashboard token={token || ""} reports={reports} />
+          )}
         </TabsContent>
 
         <TabsContent value="reports">
@@ -616,6 +707,17 @@ export const AdminDashboard = ({ reports, onUpdateReport, token }: AdminDashboar
                       <SelectItem value="1">P1 - Very Low</SelectItem>
                     </SelectContent>
                   </Select>
+                  <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                    <SelectTrigger className="w-40">
+                      <SelectValue placeholder="Category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {REPORT_CATEGORIES.map((c) => (
+                        <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </CardContent>
@@ -647,7 +749,9 @@ export const AdminDashboard = ({ reports, onUpdateReport, token }: AdminDashboar
                     {filteredReports.map((report) => (
                       <tr key={report.id} className="border-b hover:bg-gray-50">
                         <td className="p-4">
-                          <span className="font-mono text-sm">{report.id}</span>
+                          <span className="font-mono text-sm">
+                            {report.reportId || report.id.slice(-8).toUpperCase()}
+                          </span>
                         </td>
                         <td className="p-4">
                           <div className="max-w-xs">
@@ -677,118 +781,14 @@ export const AdminDashboard = ({ reports, onUpdateReport, token }: AdminDashboar
                           {formatDate(report.createdAt)}
                         </td>
                         <td className="p-4">
-                          <Dialog>
-                            <DialogTrigger asChild>
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => {
-                                  setSelectedReport(report);
-                                  setNewStatus(report.status);
-                                  setStaffComment(report.staffComment || "");
-                                }}
-                              >
-                                <Eye className="h-4 w-4 mr-1" />
-                                View
-                              </Button>
-                            </DialogTrigger>
-                            <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
-                              {selectedReport && (
-                                <>
-                                  <DialogHeader>
-                                    <DialogTitle className="flex items-center gap-2">
-                                      <span>Report #{selectedReport.id}</span>
-                                      <Badge className={cn("text-xs", getStatusColor(selectedReport.status))}>
-                                        {selectedReport.status}
-                                      </Badge>
-                                    </DialogTitle>
-                                    <DialogDescription>
-                                      Submitted on {formatDate(selectedReport.createdAt)}
-                                    </DialogDescription>
-                                  </DialogHeader>
-                                  
-                                  <div className="space-y-6">
-                                    <div className="space-y-4">
-                                      <div>
-                                        <h3 className="font-semibold text-gray-900 mb-2">Issue Details</h3>
-                                        <h4 className="font-medium text-lg">{selectedReport.title}</h4>
-                                        <p className="text-gray-600 mt-1">{selectedReport.description}</p>
-                                      </div>
-
-                                      {selectedReport.photoUrl && (
-                                        <div>
-                                          <h4 className="font-medium mb-2">Photo Evidence</h4>
-                                          <img 
-                                            src={selectedReport.photoUrl} 
-                                            alt="Issue photo" 
-                                            className="w-full h-48 object-cover rounded-lg border"
-                                          />
-                                        </div>
-                                      )}
-
-                                      <div className="grid grid-cols-2 gap-4 text-sm">
-                                        <div>
-                                          <span className="font-medium">Category:</span>
-                                          <p className="text-gray-600">{selectedReport.category}</p>
-                                        </div>
-                                        <div>
-                                          <span className="font-medium">Priority:</span>
-                                          <p className={cn("font-medium", getPriorityColor(selectedReport.priority))}>
-                                            P{selectedReport.priority}
-                                          </p>
-                                        </div>
-                                        <div className="col-span-2">
-                                          <span className="font-medium">Location:</span>
-                                          <p className="text-gray-600">{selectedReport.location.address}</p>
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    <div className="space-y-4 pt-4 border-t">
-                                      <h3 className="font-semibold text-gray-900">Update Status</h3>
-                                      
-                                      <div className="space-y-2">
-                                        <Label htmlFor="status">New Status</Label>
-                                        <Select value={newStatus} onValueChange={setNewStatus}>
-                                          <SelectTrigger>
-                                            <SelectValue placeholder="Select status" />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            <SelectItem value="Submitted">Submitted</SelectItem>
-                                            <SelectItem value="Assigned">Assigned</SelectItem>
-                                            <SelectItem value="In Progress">In Progress</SelectItem>
-                                            <SelectItem value="Resolved">Resolved</SelectItem>
-                                            <SelectItem value="Closed">Closed</SelectItem>
-                                          </SelectContent>
-                                        </Select>
-                                      </div>
-
-                                      <div className="space-y-2">
-                                        <Label htmlFor="comment">Staff Comment</Label>
-                                        <Textarea
-                                          id="comment"
-                                          placeholder="Add a comment about the status update..."
-                                          value={staffComment}
-                                          onChange={(e) => setStaffComment(e.target.value)}
-                                          rows={3}
-                                        />
-                                      </div>
-
-                                      <Button 
-                                        variant="default"
-                                        onClick={handleUpdateReport}
-                                        className="w-full"
-                                        disabled={!newStatus || newStatus === selectedReport.status}
-                                      >
-                                        <MessageSquare className="h-4 w-4 mr-2" />
-                                        Update Report
-                                      </Button>
-                                    </div>
-                                  </div>
-                                </>
-                              )}
-                            </DialogContent>
-                          </Dialog>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openReportPanel(report)}
+                          >
+                            <Eye className="h-4 w-4 mr-1" />
+                            Manage
+                          </Button>
                         </td>
                       </tr>
                     ))}
@@ -799,6 +799,19 @@ export const AdminDashboard = ({ reports, onUpdateReport, token }: AdminDashboar
           </Card>
         </TabsContent>
       </Tabs>
+
+      <AdminReportPanel
+        report={selectedReport}
+        open={panelOpen}
+        onOpenChange={(open) => {
+          setPanelOpen(open);
+          if (!open) setSelectedReport(null);
+        }}
+        onSave={async (reportId, updates) => {
+          await onUpdateReport(reportId, updates);
+          onRefresh?.();
+        }}
+      />
     </div>
   );
 };

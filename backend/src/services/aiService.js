@@ -4,30 +4,56 @@ const logger = require('../config/logger');
 // Keyword matrix for category detection
 const CATEGORY_KEYWORDS = {
   Pothole: [
-    'pothole', 'potholes', 'hole', 'crater', 'road damage', 'road surface',
-    'asphalt', 'road crack', 'street damage', 'rutting', 'pavement', 'roadway'
+    'pothole', 'potholes', 'hole', 'crater', 'road surface',
+    'asphalt', 'road crack', 'rutting', 'pavement', 'roadway'
+  ],
+  'Road Damage': [
+    'road damage', 'broken road', 'cracked road', 'uneven road', 'road repair',
+    'footpath', 'sidewalk', 'pavement damage', 'manhole', 'speed breaker broken'
   ],
   Waste: [
-    'waste', 'garbage', 'trash', 'litter', 'pollution', 'polluted', 'wastewater',
-    'sewage', 'drainage', 'garbage collection', 'dustbin', 'waste management',
-    'refuse', 'rubbish', 'waste disposal', 'illegal dumping', 'dump'
+    'waste', 'garbage', 'trash', 'litter', 'pollution', 'polluted',
+    'garbage collection', 'dustbin', 'refuse', 'rubbish', 'illegal dumping', 'dump'
+  ],
+  Sanitation: [
+    'sanitation', 'toilet', 'public toilet', 'hygiene', 'sewage', 'sewer',
+    'open defecation', 'cleanliness', 'sweeping', 'municipal cleaning'
   ],
   Light: [
     'light', 'streetlight', 'street light', 'lamp', 'lamps', 'lighting', 'dark',
-    'electricity', 'power', 'outage', 'pole', 'wire', 'electrical', 'bulb',
-    'street lamp', 'public lighting', 'illumination'
+    'bulb', 'street lamp', 'public lighting', 'illumination'
+  ],
+  Streetlight: [
+    'streetlight', 'street light', 'lamp post', 'light pole', 'dark area', 'no lighting'
   ],
   Water: [
     'water', 'water supply', 'leak', 'leakage', 'pipeline', 'pipe', 'tap',
-    'drinking water', 'water tank', 'borewell', 'bore well', 'pump', 'flood',
-    'flooding', 'waterlogging', 'drain', 'storm water', 'sewer', 'shortage',
-    'water connection', 'contamination'
+    'drinking water', 'water tank', 'borewell', 'pump', 'water connection', 'contamination'
+  ],
+  Drainage: [
+    'drain', 'drainage', 'storm water', 'waterlogging', 'blocked drain', 'flood',
+    'flooding', 'overflow', 'gutter', 'nala', 'sewer overflow'
   ],
   Traffic: [
     'traffic', 'signal', 'traffic light', 'sign', 'road sign', 'signage',
     'road marking', 'congestion', 'jams', 'accident', 'intersection', 'pedestrian',
-    'crosswalk', 'zebra crossing', 'speed breaker', 'speed bump', 'parking',
-    'illegal parking', 'vehicle', 'congestion'
+    'crosswalk', 'zebra crossing', 'parking', 'illegal parking', 'vehicle'
+  ],
+  Parks: [
+    'park', 'garden', 'playground', 'green space', 'tree', 'plantation',
+    'bench', 'fence', 'landscaping', 'maintenance', 'overgrown'
+  ],
+  Noise: [
+    'noise', 'loud', 'sound pollution', 'construction noise', 'horn', 'music',
+    'disturbance', 'decibel', 'night noise'
+  ],
+  Building: [
+    'building', 'structure', 'wall', 'collapse', 'crack', 'facade', 'illegal construction',
+    'encroachment', 'demolition', 'unsafe building'
+  ],
+  'Public Safety': [
+    'safety', 'danger', 'hazard', 'fire', 'electrocution', 'open wire', 'accident',
+    'crime', 'security', 'cctv', 'emergency', 'injury', 'unsafe'
   ],
   Other: []
 };

@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { MessageSquare, User, Shield, AlertCircle } from "lucide-react";
-import { mockUsers } from "@/services/mockData";
 import { apiService } from "@/services/apiService";
 
 interface LoginProps {
@@ -37,14 +36,14 @@ export const Login = ({ onLogin }: LoginProps) => {
         onLogin({
           id: response.user._id || response.user.id,
           name: response.user.name,
-          role: response.user.role === "staff" ? "staff" : "citizen"
+          role: response.user.role === "staff" || response.user.role === "admin" ? "staff" : "citizen"
         });
       } else {
         setError("Login failed. Please check your credentials.");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Login error:', error);
-      setError(error.message || "Login failed. Please try again.");
+      setError(error instanceof Error ? error.message : "Login failed. Please try again.");
     }
     
     setIsLoading(false);
@@ -55,47 +54,49 @@ export const Login = ({ onLogin }: LoginProps) => {
     setError("");
     
     try {
-      // Use the test user credentials created earlier
-      let email, password;
+      let email, password, registerPayload;
       if (role === "citizen") {
         email = "test@example.com";
         password = "password123";
+        registerPayload = {
+          name: "Demo Citizen",
+          email,
+          password,
+          role: "citizen"
+        };
       } else {
-        // For staff, try to use the same credentials but if it fails, fallback to mock
-        email = "staff@example.com";
-        password = "password123";
+        email = "admin@civiconnect.gov.in";
+        password = "Admin@123";
+        registerPayload = {
+          name: "Demo Staff",
+          email,
+          password,
+          role: "staff",
+          department: "general"
+        };
       }
       
-      const response = await apiService.login(email, password);
+      let response;
+
+      try {
+        response = await apiService.login(email, password);
+      } catch {
+        await apiService.register(registerPayload);
+        response = await apiService.login(email, password);
+      }
       
       if (response.success && response.user) {
         onLogin({
           id: response.user._id || response.user.id,
           name: response.user.name,
-          role: response.user.role === "staff" ? "staff" : "citizen"
+          role: response.user.role === "staff" || response.user.role === "admin" ? "staff" : "citizen"
         });
       } else {
-        // Fallback to mock user for demo
-        const mockUser = mockUsers.find(user => user.role === role);
-        if (mockUser) {
-          onLogin({
-            id: mockUser.id,
-            name: mockUser.name,
-            role: mockUser.role
-          });
-        }
+        setError("Quick login failed. Please make sure the backend is running.");
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Quick login error:', error);
-      // Fallback to mock user for demo
-      const mockUser = mockUsers.find(user => user.role === role);
-      if (mockUser) {
-        onLogin({
-          id: mockUser.id,
-          name: mockUser.name,
-          role: mockUser.role
-        });
-      }
+      setError(error instanceof Error ? error.message : "Quick login failed. Please make sure the backend is running.");
     }
     
     setIsLoading(false);

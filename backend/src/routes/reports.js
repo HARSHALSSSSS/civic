@@ -13,13 +13,20 @@ const {
   markAllNotificationsRead
 } = require('../controllers/reportController');
 const { getAdvancedAnalytics, getGeospatialSummary, getStats } = require('../controllers/analyticsController');
-const { protect, optionalAuth } = require('../middleware/auth');
+const { protect, optionalAuth, authorize } = require('../middleware/auth');
 const { upload, processImages } = require('../middleware/upload');
 const Report = require('../models/Report');
 
 const router = express.Router();
 
-// Validation rules
+const toOptionalBool = (value) => {
+  if (value === undefined || value === '' || value === null) return undefined;
+  if (value === true || value === 'true') return true;
+  if (value === false || value === 'false') return false;
+  return undefined;
+};
+
+// Validation rules (toInt/toFloat support FormData string values)
 const createReportValidation = [
   body('title')
     .trim()
@@ -30,15 +37,28 @@ const createReportValidation = [
     .isLength({ min: 10, max: 2000 })
     .withMessage('Description must be between 10 and 2000 characters'),
   body('category')
-    .isIn(['Pothole', 'Waste', 'Light', 'Water', 'Traffic', 'Other'])
+    .isIn([
+      'Pothole', 'Road Damage', 'Waste', 'Sanitation', 'Light', 'Streetlight',
+      'Water', 'Drainage', 'Traffic', 'Parks', 'Noise', 'Building',
+      'Public Safety', 'Other'
+    ])
     .withMessage('Please select a valid category'),
+  body('subcategory').optional().trim().isLength({ max: 100 }),
+  body('urgencyLevel').optional().isIn(['low', 'medium', 'high', 'emergency']),
+  body('contactPreference').optional().isIn(['app', 'email', 'phone', 'none']),
+  body('affectedArea').optional().isIn(['individual', 'street', 'block', 'neighborhood']),
+  body('landmark').optional().trim().isLength({ max: 200 }),
+  body('isPublic').optional().customSanitizer(toOptionalBool),
   body('priority')
+    .toInt()
     .isInt({ min: 1, max: 5 })
     .withMessage('Priority must be between 1 and 5'),
   body('longitude')
+    .toFloat()
     .isFloat({ min: -180, max: 180 })
     .withMessage('Please provide a valid longitude'),
   body('latitude')
+    .toFloat()
     .isFloat({ min: -90, max: 90 })
     .withMessage('Please provide a valid latitude'),
   body('address')
@@ -61,12 +81,14 @@ const updateReportValidation = [
     .withMessage('Description must be between 10 and 2000 characters'),
   body('priority')
     .optional()
+    .toInt()
     .isInt({ min: 1, max: 5 })
     .withMessage('Priority must be between 1 and 5')
 ];
 
 const feedbackValidation = [
   body('rating')
+    .toInt()
     .isInt({ min: 1, max: 5 })
     .withMessage('Rating must be between 1 and 5'),
   body('comment')
@@ -76,115 +98,106 @@ const feedbackValidation = [
     .withMessage('Comment cannot exceed 500 characters')
 ];
 
-// Add new citizen and admin routes
-// Get my reports (citizen view)
+const reportPopulate = [
+  { path: 'citizenId', select: 'name email phone' },
+  { path: 'assignedStaffId', select: 'name staffId department role' },
+  { path: 'staffComments.staffId', select: 'name staffId department' },
+  { path: 'statusHistory.changedBy', select: 'name role department' }
+];
+
+// --- Static routes MUST come before /:id ---
+
 router.get('/my', protect, async (req, res, next) => {
   try {
-    console.log("Fetching reports for citizen ID:", req.user.id);
     const reports = await Report.find({ citizenId: req.user.id })
       .sort({ createdAt: -1 })
-      .populate('citizenId', 'name email')
-      .populate('assignedStaffId', 'name staffId department');
-    
+      .populate(reportPopulate);
+
     res.json({
       success: true,
       count: reports.length,
       reports
     });
   } catch (error) {
-    console.error("Error fetching citizen reports:", error);
     next(error);
   }
 });
 
-// Get all reports (admin/staff view)
 router.get('/admin', protect, async (req, res, next) => {
   try {
-    // Check if user is staff
     if (req.user.role !== 'staff' && req.user.role !== 'admin') {
       return res.status(403).json({
         success: false,
         message: 'Access denied: Staff role required'
       });
     }
-    
-    console.log("Fetching all reports for staff/admin");
+
     const reports = await Report.find({})
       .sort({ createdAt: -1 })
-      .populate('citizenId', 'name email')
-      .populate('assignedStaffId', 'name staffId department');
-    
+      .populate(reportPopulate);
+
     res.json({
       success: true,
       count: reports.length,
       reports
     });
   } catch (error) {
-    console.error("Error fetching admin reports:", error);
     next(error);
   }
 });
 
-// Get community issues (public view for citizens)
 router.get('/community', protect, async (req, res, next) => {
   try {
-    console.log("Fetching community issues for public view");
     const reports = await Report.find({ isPublic: true })
       .sort({ createdAt: -1 })
-      .select('title category status priority location.address createdAt updatedAt photos')
-      .limit(50); // Limit for performance
-    
-    // Anonymize the data
+      .select('title category status priority supportCount location.address createdAt updatedAt photos')
+      .limit(50);
+
     const anonymizedReports = reports.map(report => ({
       id: report._id,
       title: report.title,
       category: report.category,
       status: report.status,
       priority: report.priority,
+      supportCount: report.supportCount || 0,
       location: {
-        address: report.location?.address?.replace(/\d+/g, 'XXX') || 'Location withheld', // Anonymize specific addresses
-        coordinates: null // Don't show exact coordinates
+        address: report.location?.address?.replace(/\d+/g, 'XXX') || 'Location withheld',
+        coordinates: null
       },
       photoUrl: report.photos?.[0]?.url,
       createdAt: report.createdAt,
       updatedAt: report.updatedAt,
-      citizenId: 'Anonymous' // Don't show who submitted
+      citizenId: 'Anonymous'
     }));
-    
+
     res.json({
       success: true,
       count: anonymizedReports.length,
       reports: anonymizedReports
     });
   } catch (error) {
-    console.error("Error fetching community issues:", error);
     next(error);
   }
 });
 
-// Original routes
+router.get('/notifications', protect, getNotifications);
+router.put('/notifications/read-all', protect, markAllNotificationsRead);
+router.put('/notifications/:id/read', protect, markNotificationRead);
+
+router.get('/analytics/advanced', protect, authorize('staff', 'admin'), getAdvancedAnalytics);
+router.get('/analytics/geospatial', protect, authorize('staff', 'admin'), getGeospatialSummary);
+router.get('/analytics/stats', getStats);
+
 router.route('/')
   .get(optionalAuth, getReports)
   .post(protect, upload, processImages, createReportValidation, createReport);
+
+router.post('/:id/feedback', protect, feedbackValidation, submitFeedback);
+router.post('/:id/support', protect, toggleSupport);
 
 router.route('/:id')
   .get(optionalAuth, getReport)
   .put(protect, updateReportValidation, updateReport)
   .delete(protect, deleteReport);
-
-router.post('/:id/feedback', protect, feedbackValidation, submitFeedback);
-
-// Support (upvote) routes
-router.post('/:id/support', protect, toggleSupport);
-
-// Notification routes
-router.get('/notifications', protect, getNotifications);
-router.put('/notifications/:id/read', protect, markNotificationRead);
-router.put('/notifications/read-all', protect, markAllNotificationsRead);
-
-// Analytics routes
-router.get('/analytics/advanced', protect, getAdvancedAnalytics);
-router.get('/analytics/geospatial', protect, getGeospatialSummary);
-router.get('/analytics/stats', getStats);
 
 module.exports = router;
